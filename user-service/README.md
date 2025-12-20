@@ -8,10 +8,7 @@ This is a FastAPI-based user management service with REST API and GraphQL suppor
 
 ## Running the Service
 1. Navigate to the project root (`d:\Project\Project-UAS-IAE_Dompet-Digital-Sawit`).
-2. Run the service:
-``bash
-docker-compose up --build -d user-service
-``
+2. Run the service: `docker-compose up --build -d user-service`
 
 3. The service will be available at `http://localhost:8001`.
 4. Access GraphQL playground at `http://localhost:8001/graphql`.
