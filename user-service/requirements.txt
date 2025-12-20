@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+python-jose[cryptography]
+passlib[bcrypt]
+python-dotenv
+httpx
+pyjwt
+requests
+ariadne
+graphql-core>=3.2.0

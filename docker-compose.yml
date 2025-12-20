@@ -1,0 +1,10 @@
+services:
+  user-service:
+    build:
+      context: ./user-service
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./user-service/.env
+    volumes:
+      - ./user-service:/app 
