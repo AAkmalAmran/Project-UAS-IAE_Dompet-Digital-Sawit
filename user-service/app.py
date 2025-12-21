@@ -35,6 +35,12 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class RegisterRequest(BaseModel):
+    username: str
+    fullname: str
+    email: EmailStr
+    password: str
+
 # ================= DATABASE =================
 DATABASE_URL = "sqlite:///./users.db"
 
@@ -142,23 +148,23 @@ def get_db():
 
 # ================= REST =================
 @app.post("/auth/register")
-def register(username: str, fullname: str, email: str, password: str, db: Session = Depends(get_db)):
-    validate_email(email)
-    validate_password(password)
+def register(data: RegisterRequest, db: Session = Depends(get_db)):
+    validate_email(data.email)
+    validate_password(data.password)
 
-    if db.query(User).filter(User.email == email).first():
+    if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email sudah terdaftar")
 
     user = User(
-        username=username,
-        fullname=fullname,
-        email=email,
-        password=hash_password(password),
+        username=data.username,
+        fullname=data.fullname,
+        email=data.email,
+        password=hash_password(data.password),
         role="Nasabah"
     )
     db.add(user)
     db.commit()
-    return {"message": "User registered", "user_id": user.user_id}
+    return {"message": "User berhasil dibuat", "user_id": user.user_id, "email": user.email}
 
 @app.post("/auth/login")
 def login(data: LoginRequest, db: Session = Depends(get_db)):
