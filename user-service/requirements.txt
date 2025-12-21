@@ -9,3 +9,5 @@ pyjwt
 requests
 ariadne
 graphql-core>=3.2.0
+pydantic
+email-validator

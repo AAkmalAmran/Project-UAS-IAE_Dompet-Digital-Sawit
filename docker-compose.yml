@@ -8,6 +8,8 @@ services:
       - ./user-service/.env
     volumes:
       - ./user-service:/app
+      - ./user-service/private.pem:/app/private.pem:ro
+      - ./user-service/public.pem:/app/public.pem:ro
 
   wallet-service:
     build:
@@ -18,3 +20,4 @@ services:
       - ./wallet-service/.env
     volumes:
       - ./wallet-service:/app 
+      - ./user-service/public.pem:/app/public.pem:ro
