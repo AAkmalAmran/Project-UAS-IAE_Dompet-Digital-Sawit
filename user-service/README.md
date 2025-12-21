@@ -7,11 +7,13 @@ This is a FastAPI-based user management service with REST API and GraphQL suppor
 - Copy `.env.example` to `.env` and configure environment variables (e.g., `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`).
 
 ## Running the Service
-1. Navigate to the project root (`d:\Project\Project-UAS-IAE_Dompet-Digital-Sawit`).
-2. Run the service: `docker-compose up --build -d user-service`
-
-3. The service will be available at `http://localhost:8001`.
-4. Access GraphQL playground at `http://localhost:8001/graphql`.
+1. open gitbash, run ('cd user-service') 
+2. Run (`openssl genrsa -out private.pem 2048`) 
+3. Run (`openssl rsa -in private.pem -pubout -out public.pem`)
+4. Navigate to the project root (`d:\Project\Project-UAS-IAE_Dompet-Digital-Sawit`).
+5. Run the service: `docker-compose up --build -d user-service`
+6. The service will be available at `http://localhost:8001`.
+7. Access GraphQL playground at `http://localhost:8001/graphql`.
 
 ## REST API Endpoints
 All endpoints require authentication via JWT token in the `Authorization: Bearer <token>` header, except for registration and login.
