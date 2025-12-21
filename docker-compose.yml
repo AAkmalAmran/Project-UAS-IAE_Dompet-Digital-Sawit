@@ -7,4 +7,14 @@ services:
     env_file:
       - ./user-service/.env
     volumes:
-      - ./user-service:/app 
+      - ./user-service:/app
+
+  wallet-service:
+    build:
+      context: ./wallet-service
+    ports:
+      - "8002:8002"
+    env_file:
+      - ./wallet-service/.env
+    volumes:
+      - ./wallet-service:/app 
