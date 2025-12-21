@@ -185,6 +185,8 @@ def login(email: str, password: str, db: Session = Depends(get_db)):
 
     token = create_access_token({
         "sub": user.email,
+        "user_id": user.user_id,
+        "username": user.username,
         "role": user.role
     })
 
@@ -276,6 +278,8 @@ def resolve_login(_, info, email, password):
 
         token = create_access_token({
             "sub": user.username,
+            "user_id": user.user_id,
+            "username": user.username,
             "role": user.role
         })
         return token

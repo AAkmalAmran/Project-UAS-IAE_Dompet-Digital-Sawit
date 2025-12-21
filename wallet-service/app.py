@@ -709,6 +709,21 @@ type_defs = """
     type Mutation {
         createWallet(walletName: String!): Wallet!
         updateWalletName(walletId: String!, walletName: String!): Wallet!
+        topupWallet(walletId: String!, amount: Float!, description: String): TopupResult!
+        deleteWallet(walletId: String!): DeleteResult!
+    }
+    
+    type TopupResult {
+        success: Boolean!
+        message: String!
+        walletId: String!
+        newBalance: Float!
+        mutationLogId: String!
+    }
+    
+    type DeleteResult {
+        success: Boolean!
+        message: String!
     }
     
     type Wallet {
@@ -896,6 +911,94 @@ def resolve_update_wallet_name(_, info, walletId: str, walletName: str):
             "status": wallet.status.value if hasattr(wallet.status, 'value') else wallet.status,
             "createdAt": wallet.created_at.isoformat(),
             "updatedAt": wallet.updated_at.isoformat()
+        }
+    finally:
+        db.close()
+
+
+@mutation.field("topupWallet")
+def resolve_topup_wallet(_, info, walletId: str, amount: float, description: str = None):
+    """Topup/Add balance to a wallet"""
+    user = get_user_from_context(info)
+    db = SessionLocal()
+    try:
+        wallet = db.query(Wallet).filter(Wallet.wallet_id == walletId).first()
+        
+        if not wallet:
+            raise Exception("Wallet not found")
+        
+        # Verify ownership
+        if wallet.user_id != user.user_id:
+            raise Exception("Access denied. You can only topup your own wallet.")
+        
+        # Check if wallet is active
+        if wallet.status != WalletStatus.ACTIVE:
+            raise Exception("Wallet is frozen. Cannot perform transactions.")
+        
+        # Validate amount
+        if amount <= 0:
+            raise Exception("Amount must be greater than 0")
+        
+        # Add balance
+        balance_before = wallet.balance
+        wallet.balance += amount
+        balance_after = wallet.balance
+        wallet.updated_at = datetime.utcnow()
+        
+        # Create MutationLog (CREDIT)
+        mutation_log = MutationLog(
+            log_id=str(uuid.uuid4()),
+            wallet_id=wallet.wallet_id,
+            transaction_ref_id=None,
+            type=MutationType_.CREDIT,
+            amount=amount,
+            balance_before=balance_before,
+            balance_after=balance_after,
+            description=description or "Topup via GraphQL"
+        )
+        
+        db.add(mutation_log)
+        db.commit()
+        db.refresh(wallet)
+        db.refresh(mutation_log)
+        
+        return {
+            "success": True,
+            "message": "Topup successful",
+            "walletId": wallet.wallet_id,
+            "newBalance": wallet.balance,
+            "mutationLogId": mutation_log.log_id
+        }
+    finally:
+        db.close()
+
+
+@mutation.field("deleteWallet")
+def resolve_delete_wallet(_, info, walletId: str):
+    """Delete a wallet (balance must be 0)"""
+    user = get_user_from_context(info)
+    db = SessionLocal()
+    try:
+        wallet = db.query(Wallet).filter(Wallet.wallet_id == walletId).first()
+        
+        if not wallet:
+            raise Exception("Wallet not found")
+        
+        # Verify ownership
+        if wallet.user_id != user.user_id:
+            raise Exception("Access denied. You can only delete your own wallet.")
+        
+        # Check balance - must be 0 to delete
+        if wallet.balance > 0:
+            raise Exception(f"Cannot delete wallet with balance. Current balance: {wallet.balance}. Please withdraw all funds first.")
+        
+        # Delete the wallet (this will also cascade delete mutation logs)
+        db.delete(wallet)
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Wallet '{wallet.wallet_name}' deleted successfully"
         }
     finally:
         db.close()
