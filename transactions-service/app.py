@@ -339,7 +339,19 @@ async def create_transaction(transaction: TransactionCreate, token: dict = Depen
         if not ext["success"]: raise HTTPException(status_code=400, detail="External API Rejected")
 
     wallet_name = await get_wallet_name(transaction.wallet_id)
-    
+
+    # Cek apakah Saldo di Wallet cukup jika Withdrawal atau Payment
+    if transaction.transaction_type in [TransactionType.WITHDRAWAL, TransactionType.PAYMENT]:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(f"{WALLET_SERVICE_URL}/internal/wallet/{transaction.wallet_id}")
+                if response.status_code == 200:
+                    wallet = response.json()
+                    if wallet.get("balance", 0) < transaction.amount:
+                        raise HTTPException(status_code=400, detail="Insufficient wallet balance for this transaction")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Wallet service error: {e}")
+
     # Pydantic otomatis convert string ke Enum, jadi aman
     db_trx = Transaction(
         user_id=user_id,
@@ -355,6 +367,21 @@ async def create_transaction(transaction: TransactionCreate, token: dict = Depen
     db.refresh(db_trx)
     
     await update_wallet_balance(transaction.wallet_id, transaction.amount, transaction.transaction_type.value)
+    return db_trx
+
+@app.put("/transactions/{transaction_id}", response_model=TransactionResponse, dependencies=[Depends(JWTBearer())])
+async def update_transaction(transaction_id: str, transaction_update: TransactionUpdate, db: Session = Depends(get_db)):
+    db_trx = db.query(Transaction).filter(Transaction.transaction_id == transaction_id).first()
+    if not db_trx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    try:
+        db_trx.transaction_type = TransactionType(transaction_update.transaction_type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid transaction type")
+    
+    db.commit()
+    db.refresh(db_trx)
     return db_trx
 
 if __name__ == "__main__":
