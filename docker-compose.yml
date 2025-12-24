@@ -21,3 +21,14 @@ services:
     volumes:
       - ./wallet-service:/app 
       - ./user-service/public.pem:/app/public.pem:ro
+
+  transactions-service:
+    build:
+      context: ./transactions-service
+    ports:
+      - "8003:8003"
+    env_file:
+      - ./transactions-service/.env
+    volumes:
+      - ./transactions-service:/app
+      - ./user-service/public.pem:/app/public.pem:ro
