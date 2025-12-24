@@ -32,3 +32,14 @@ services:
     volumes:
       - ./transactions-service:/app
       - ./user-service/public.pem:/app/public.pem:ro
+
+  fraud-service:
+    build:
+      context: ./fraud-service
+    ports:
+      - "8004:8004"
+    env_file:
+      - ./fraud-service/.env
+    volumes:
+      - ./fraud-service:/app
+      - ./user-service/public.pem:/app/public.pem:ro
