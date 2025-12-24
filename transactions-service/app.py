@@ -267,6 +267,18 @@ async def resolve_create_transaction(_, info, input):
         raise Exception(f"Invalid transaction type: {trx_type_str}. Valid: deposit, withdrawal, payment, refund")
 
     wallet_name = await get_wallet_name(input["wallet_id"])
+
+    # Cek apakah Saldo di Wallet cukup jika Withdrawal atau Payment
+    if trx_type_enum in [TransactionType.WITHDRAWAL, TransactionType.PAYMENT]:
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(f"{WALLET_SERVICE_URL}/internal/wallet/{input['wallet_id']}")
+                if response.status_code == 200:
+                    wallet = response.json()
+                    if wallet.get("balance", 0) < input["amount"]:
+                        raise Exception("Insufficient wallet balance for this transaction")
+            except Exception as e:
+                raise Exception(f"Wallet service error: {e}")
     
     # 5. Save DB
     db: Session = next(get_db())

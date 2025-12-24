@@ -7,7 +7,9 @@
 4. Run (`openssl genrsa -out private.pem 2048`) 
 5. Run (`openssl rsa -in private.pem -pubout -out public.pem`)
 6. Copy file public.pem from user-service
-7. Paste file public.pem from user-service to wallet-service
+7. Paste file public.pem from user-service to each services
 8. Navigate to the project root (`d:\Project\Project-UAS-IAE_Dompet-Digital-Sawit`).
 9. Run the service: `docker-compose up --build -d user-service`
 10. Run the service: `docker-compose up --build -d wallet-service`
+11. Run the service: `docker-compose up --build -d transactions-service`
+12. Run the service: `docker-compose up --build -d fraud-service`
