@@ -357,6 +357,24 @@ schema = make_executable_schema(type_defs, query, mutation)
 app.add_route("/graphql", GraphQL(schema, debug=True))
 
 # ================= REST Endpoints =================
+@app.get("/health", status_code=200)
+async def health_check():
+    return {"status": "Transactions Service is healthy"}
+
+# List semua transaksi untuk user yang login diambil dari token
+@app.get("/transactions/list", response_model=List[TransactionResponse], dependencies=[Depends(JWTBearer())])
+async def list_transactions(token: dict = Depends(JWTBearer()), db: Session = Depends(get_db)):
+    user_id = str(token.get("user_id"))
+    transactions = db.query(Transaction).filter(Transaction.user_id == user_id).all()
+    return transactions
+
+@app.get("/transactions/{transaction_id}", response_model=TransactionResponse, dependencies=[Depends(JWTBearer())])
+async def get_transaction(transaction_id: str, db: Session = Depends(get_db)):
+    db_trx = db.query(Transaction).filter(Transaction.transaction_id == transaction_id).first()
+    if not db_trx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return db_trx
+
 @app.post("/transactions/", response_model=TransactionResponse, dependencies=[Depends(JWTBearer())])
 async def create_transaction(transaction: TransactionCreate, token: dict = Depends(JWTBearer()), db: Session = Depends(get_db)):
     user_id = str(token.get("user_id"))
