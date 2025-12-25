@@ -43,3 +43,14 @@ services:
     volumes:
       - ./fraud-service:/app
       - ./user-service/public.pem:/app/public.pem:ro
+
+  history-service:
+    build:
+      context: ./history-service
+    ports:
+      - "8005:8005"
+    env_file:
+      - ./history-service/.env
+    volumes:
+      - ./history-service:/app
+      - ./user-service/public.pem:/app/public.pem:ro
