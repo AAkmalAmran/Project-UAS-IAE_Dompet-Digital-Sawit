@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-python-jose[cryptography]
-pydantic
+ariadne
 httpx
 python-dotenv
+multipart

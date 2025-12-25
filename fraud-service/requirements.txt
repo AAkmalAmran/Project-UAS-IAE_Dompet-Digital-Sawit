@@ -2,8 +2,11 @@ fastapi
 uvicorn
 sqlalchemy
 python-jose[cryptography]
+passlib[bcrypt]
 python-dotenv
-pydantic
+httpx
 ariadne
-graphql-core
+pydantic
+email-validator
+requests
 multipart

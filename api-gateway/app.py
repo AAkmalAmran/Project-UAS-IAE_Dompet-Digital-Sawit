@@ -1,122 +1,144 @@
-import os
 import httpx
-from jose import jwt
-from fastapi import FastAPI, Request, Response, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from typing import Optional
+from fastapi import FastAPI, Request
+# Import load_schema_from_path
+from ariadne import QueryType, MutationType, make_executable_schema, load_schema_from_path
+from ariadne.asgi import GraphQL
+import os
 
-# ================= ENV & KEYS =================
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
-ALGORITHM = os.getenv("ALGORITHM", "RS256")
+# ================= CONFIG URLs =================
+USER_SRV_URL = "http://user-service:8001/graphql"
+WALLET_SRV_URL = "http://wallet-service:8002/graphql"
+TRX_SRV_URL = "http://transactions-service:8003/graphql"
+FRAUD_SRV_URL = "http://fraud-service:8004/graphql"
+HISTORY_SRV_URL = "http://history-service:8005/graphql"
 
-PUBLIC_KEY_PATH = os.path.join(BASE_DIR, "public.pem")
-if os.path.exists(PUBLIC_KEY_PATH):
-    with open(PUBLIC_KEY_PATH) as f:
-        PUBLIC_KEY = f.read()
-else:
-    PUBLIC_KEY = "" 
-
-app = FastAPI(title="API Gateway Microservices")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ================= CONFIGURATION =================
-SERVICE_MAP = {
-    "auth": os.getenv("USER_SERVICE_URL", "http://localhost:8001"),        
-    "wallet": os.getenv("WALLET_SERVICE_URL", "http://localhost:8002"),   
-    "transactions": os.getenv("TRANSACTIONS_SERVICE_URL", "http://localhost:8003"), 
-    "fraud": os.getenv("FRAUD_SERVICE_URL", "http://localhost:8004"),      
-    "history": os.getenv("HISTORY_SERVICE_URL", "http://localhost:8005"),   
-}
-
-
-STRIP_PREFIX_SERVICES = ["wallet", "fraud"]
-
-
-# ================= AUTH HELPER =================
-async def verify_token(request: Request):
-    path = request.url.path
-    
-    # 1. BYPASS AUTH untuk endpoint public (Login, Register, Docs)
-    if "login" in path or "register" in path or "docs" in path or "openapi" in path:
-        return None
-
-    # 2. VALIDASI TOKEN
+# ================= HELPER: PROXY REQUEST =================
+async def forward_request(url: str, query: str, variables: dict, request: Request):
+    headers = {}
     auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return None 
+    if auth_header:
+        headers["Authorization"] = auth_header
 
-    token = auth_header.split(" ")[1]
-    try:
-        if not PUBLIC_KEY:
-            raise HTTPException(status_code=500, detail="Public Key not found on Gateway")
-            
-        payload = jwt.decode(token, PUBLIC_KEY, algorithms=[ALGORITHM])
-        return payload
-    except Exception:
-        raise HTTPException(status_code=401, detail="Token Invalid atau Expired")
-
-# ================= PROXY ROUTE UTAMA =================
-@app.api_route("/{service_name}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def gateway_proxy(service_name: str, path: str, request: Request, user=Depends(verify_token)):
-    
-    # 1. Cek Service Ada
-    target_base_url = SERVICE_MAP.get(service_name)
-    if not target_base_url:
-        raise HTTPException(status_code=404, detail=f"Service '{service_name}' tidak ditemukan")
-
-    # 2. LOGIKA PENYUSUNAN URL
-    
-    # A. Jika GraphQL -> SELALU STRIP (Langsung ke /graphql)
-    if path == "graphql":
-        target_url = f"{target_base_url}/{path}"
-    
-    # B. Jika Service termasuk List STRIP (Wallet, Fraud, History)
-    elif service_name in STRIP_PREFIX_SERVICES:
-        target_url = f"{target_base_url}/{path}"
-        
-    # C. Jika Service butuh Prefix (Auth, Transactions)
-    else:
-        target_url = f"{target_base_url}/{service_name}/{path}"
-    
-    # 3. KIRIM REQUEST
-    query_params = request.url.query
     async with httpx.AsyncClient() as client:
         try:
-            req_headers = {k: v for k, v in request.headers.items() if k.lower() != 'host'}
-            
-            if user:
-                req_headers["x-user-id"] = str(user.get("user_id"))
-                req_headers["x-user-role"] = str(user.get("role"))
+            resp = await client.post(url, json={"query": query, "variables": variables}, headers=headers)
+            if resp.status_code != 200:
+                raise Exception(f"Service Error ({resp.status_code}): {resp.text}")
 
-            body = await request.body()
+            result = resp.json()
+            if "errors" in result:
+                raise Exception(result["errors"][0]["message"])
+            
+            return result.get("data")
+        except httpx.RequestError:
+            raise Exception("Gagal menghubungi Microservice. Pastikan container berjalan.")
 
-            response = await client.request(
-                method=request.method,
-                url=target_url,
-                params=query_params,
-                headers=req_headers,
-                content=body,
-                timeout=30.0
-            )
-            
-            return Response(
-                content=response.content,
-                status_code=response.status_code,
-                headers=dict(response.headers)
-            )
-            
-        except httpx.RequestError as e:
-            print(f"Connection Error to {target_url}: {str(e)}")
-            raise HTTPException(status_code=503, detail=f"Gagal koneksi ke service {service_name}")
+# ================= LOAD SCHEMA DARI FILE =================
+# Pastikan file schema.graphql ada di folder yang sama
+type_defs = load_schema_from_path("schema.graphql")
+
+query = QueryType()
+mutation = MutationType()
+
+# ================= RESOLVERS =================
+
+# --- USER SERVICE ---
+@query.field("myProfile")
+async def resolve_my_profile(_, info, token):
+    q = "query($t: String!) { myProfile(token: $t) { user_id username email role } }"
+    data = await forward_request(USER_SRV_URL, q, {"t": token}, info.context["request"])
+    return data["myProfile"]
+
+@mutation.field("registerUser")
+async def resolve_register(_, info, username, fullname, email, password):
+    q = """
+        mutation($u: String!, $f: String!, $e: String!, $p: String!) {
+            registerUser(username: $u, fullname: $f, email: $e, password: $p)
+        }
+    """
+    vars = {"u": username, "f": fullname, "e": email, "p": password}
+    data = await forward_request(USER_SRV_URL, q, vars, info.context["request"])
+    return data["registerUser"]
+
+@mutation.field("loginUser")
+async def resolve_login(_, info, email, password):
+    q = """
+        mutation($e: String!, $p: String!) {
+            loginUser(email: $e, password: $p) {
+                access_token token_type user { user_id username email role }
+            }
+        }
+    """
+    data = await forward_request(USER_SRV_URL, q, {"e": email, "p": password}, info.context["request"])
+    return data["loginUser"]
+
+# --- WALLET SERVICE ---
+@query.field("myWallets")
+async def resolve_wallets(_, info):
+    q = "{ myWallets { walletId userId walletName balance status } }"
+    data = await forward_request(WALLET_SRV_URL, q, {}, info.context["request"])
+    return data["myWallets"]
+
+@mutation.field("createWallet")
+async def resolve_create_wallet(_, info, walletName):
+    q = """
+        mutation($n: String!) {
+            createWallet(walletName: $n) { walletId userId walletName balance status }
+        }
+    """
+    data = await forward_request(WALLET_SRV_URL, q, {"n": walletName}, info.context["request"])
+    return data["createWallet"]
+
+# --- TRANSACTION SERVICE ---
+@query.field("myTransactions")
+async def resolve_my_trx(_, info):
+    q = "{ myTransactions { transactionId userId walletId amount type status createdAt } }"
+    data = await forward_request(TRX_SRV_URL, q, {}, info.context["request"])
+    return data["myTransactions"]
+
+@mutation.field("createTransaction")
+async def resolve_create_trx(_, info, input):
+    q = """
+        mutation($i: TransactionInput!) {
+            createTransaction(input: $i) { transactionId userId walletId amount type status createdAt }
+        }
+    """
+    data = await forward_request(TRX_SRV_URL, q, {"i": input}, info.context["request"])
+    return data["createTransaction"]
+
+# --- HISTORY SERVICE ---
+@query.field("myHistory")
+async def resolve_history(_, info):
+    q = "{ myHistory { historyId transactionId userId amount type status createdAt } }"
+    data = await forward_request(HISTORY_SRV_URL, q, {}, info.context["request"])
+    return data["myHistory"]
+
+# --- FRAUD SERVICE ---
+@query.field("getFraudLogs")
+async def resolve_fraud_logs(_, info):
+    q = "{ getFraudLogs { logId userId amount status reason } }"
+    data = await forward_request(FRAUD_SRV_URL, q, {}, info.context["request"])
+    return data["getFraudLogs"]
+
+@mutation.field("checkFraud")
+async def resolve_check_fraud(_, info, input):
+    q = """
+        mutation($i: CheckFraudInput!) {
+            checkFraud(input: $i) { is_fraud status reason log_id }
+        }
+    """
+    data = await forward_request(FRAUD_SRV_URL, q, {"i": input}, info.context["request"])
+    return data["checkFraud"]
+
+# ================= APP SETUP =================
+schema = make_executable_schema(type_defs, query, mutation)
+app = FastAPI(title="API Gateway (Unified GraphQL)")
+
+@app.get("/health")
+def health():
+    return {"status": "Gateway Healthy", "port": 8000}
+
+app.add_route("/graphql", GraphQL(schema, debug=True))
 
 if __name__ == "__main__":
     import uvicorn

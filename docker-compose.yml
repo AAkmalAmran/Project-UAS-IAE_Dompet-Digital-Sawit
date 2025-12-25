@@ -1,68 +1,112 @@
+version: '3.8'
+
 services:
-
-  api-gateway:
-    build:
-      context: ./api-gateway
-    ports:
-      - "8000:8000"
-    env_file:
-      - ./api-gateway/.env
-    volumes:
-      - ./api-gateway:/app
-      - ./user-service/public.pem:/app/public.pem:ro
-
+  # =========================================
+  # 1. USER SERVICE (Penyedia Key & Auth)
+  # =========================================
   user-service:
-    build:
+    build: 
       context: ./user-service
+    container_name: user-service
     ports:
       - "8001:8001"
-    env_file:
-      - ./user-service/.env
     volumes:
-      - ./user-service:/app
-      - ./user-service/private.pem:/app/private.pem:ro
-      - ./user-service/public.pem:/app/public.pem:ro
+      - ./user-service:/app  # Sinkronisasi kode & DB SQLite ke Host
+    networks:
+      - app-network
 
+  # =========================================
+  # 2. WALLET SERVICE (Butuh public.pem)
+  # =========================================
   wallet-service:
-    build:
+    build: 
       context: ./wallet-service
+    container_name: wallet-service
     ports:
       - "8002:8002"
-    env_file:
-      - ./wallet-service/.env
     volumes:
-      - ./wallet-service:/app 
-      - ./user-service/public.pem:/app/public.pem:ro
+      - ./wallet-service:/app
+      # PENTING: Mount public.pem dari user-service ke sini agar bisa verify token
+      - ./user-service/public.pem:/app/public.pem:ro 
+    depends_on:
+      - user-service
+    networks:
+      - app-network
 
+  # =========================================
+  # 3. TRANSACTIONS SERVICE (Butuh public.pem)
+  # =========================================
   transactions-service:
-    build:
+    build: 
       context: ./transactions-service
+    container_name: transactions-service
     ports:
       - "8003:8003"
-    env_file:
-      - ./transactions-service/.env
     volumes:
       - ./transactions-service:/app
       - ./user-service/public.pem:/app/public.pem:ro
+    depends_on:
+      - user-service
+      - wallet-service
+      - fraud-service
+      - history-service
+    networks:
+      - app-network
 
+  # =========================================
+  # 4. FRAUD SERVICE (Butuh public.pem)
+  # =========================================
   fraud-service:
-    build:
+    build: 
       context: ./fraud-service
+    container_name: fraud-service
     ports:
       - "8004:8004"
-    env_file:
-      - ./fraud-service/.env
     volumes:
       - ./fraud-service:/app
       - ./user-service/public.pem:/app/public.pem:ro
+    depends_on:
+      - user-service
+    networks:
+      - app-network
 
+  # =========================================
+  # 5. HISTORY SERVICE (Butuh public.pem)
+  # =========================================
   history-service:
-    build:
+    build: 
       context: ./history-service
+    container_name: history-service
     ports:
       - "8005:8005"
-    env_file:
-      - ./history-service/.env
     volumes:
       - ./history-service:/app
       - ./user-service/public.pem:/app/public.pem:ro
+    depends_on:
+      - user-service
+    networks:
+      - app-network
+
+  # =========================================
+  # 6. API GATEWAY (Pintu Masuk Utama)
+  # =========================================
+  api-gateway:
+    build: 
+      context: ./api-gateway
+    container_name: api-gateway
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api-gateway:/app
+    depends_on:
+      - user-service
+      - wallet-service
+      - transactions-service
+      - fraud-service
+      - history-service
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

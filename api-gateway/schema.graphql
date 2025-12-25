@@ -1,0 +1,99 @@
+# --- USER TYPES ---
+type UserProfile {
+    user_id: ID
+    username: String
+    email: String
+    role: String
+}
+type LoginResponse {
+    access_token: String
+    token_type: String
+    user: UserProfile
+}
+
+# --- WALLET TYPES ---
+type Wallet {
+    walletId: String
+    userId: String
+    walletName: String
+    balance: Float
+    status: String
+}
+
+# --- TRANSACTION TYPES ---
+type Transaction {
+    transactionId: String
+    userId: String
+    walletId: String
+    amount: Float
+    type: String
+    status: String
+    createdAt: String
+}
+input TransactionInput {
+    walletId: String!
+    amount: Float!
+    type: String!
+}
+
+# --- HISTORY TYPES ---
+type History {
+    historyId: String
+    transactionId: String
+    userId: String
+    amount: Float
+    type: String
+    status: String
+    createdAt: String
+}
+
+# --- FRAUD TYPES ---
+type FraudLog {
+    logId: String
+    userId: String
+    amount: Float
+    status: String
+    reason: String
+}
+type FraudCheckResult {
+    is_fraud: Boolean
+    status: String
+    reason: String
+    log_id: String
+}
+input CheckFraudInput {
+    userId: String!
+    amount: Float!
+}
+
+type Query {
+    # User (Butuh Token)
+    myProfile(token: String!): UserProfile
+    
+    # Wallet (Butuh Token)
+    myWallets: [Wallet]
+    
+    # Transaction (Butuh Token)
+    myTransactions: [Transaction]
+    
+    # History (Butuh Token)
+    myHistory: [History]
+    
+    # Fraud (Butuh Token Admin)
+    getFraudLogs: [FraudLog]
+}
+
+type Mutation {
+    # User (Public)
+    registerUser(username: String!, fullname: String!, email: String!, password: String!): String
+    loginUser(email: String!, password: String!): LoginResponse
+    
+    # Wallet (Butuh Token)
+    createWallet(walletName: String!): Wallet
+    
+    # Transaction (Butuh Token)
+    createTransaction(input: TransactionInput!): Transaction
+    
+    # Fraud (Butuh Token)
+    checkFraud(input: CheckFraudInput!): FraudCheckResult
+}
