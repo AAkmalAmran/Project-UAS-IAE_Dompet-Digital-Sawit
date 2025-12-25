@@ -1,4 +1,16 @@
 services:
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./api-gateway/.env
+    volumes:
+      - ./api-gateway:/app
+      - ./user-service/public.pem:/app/public.pem:ro
+
   user-service:
     build:
       context: ./user-service

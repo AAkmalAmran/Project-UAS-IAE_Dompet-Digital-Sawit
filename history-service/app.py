@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import FastAPI, Depends, status, HTTPException
+from fastapi import FastAPI, Depends, status, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import (
     create_engine, Column, String, Float, DateTime, Enum, Index, Text
@@ -216,7 +216,7 @@ def create_history_wallet(
 
 
 @app.get(
-    "/internal/history/wallet/{wallet_id}",
+    "/wallet/{wallet_id}",
     response_model=List[HistoryWalletResponse],
     tags=["Internal-Wallet"],
 )
@@ -261,42 +261,26 @@ def create_history_transaction(
     db.refresh(hist)
     return hist
 
-
-@app.get(
-    "/internal/history/transaction/{transaction_id}",
-    response_model=HistoryTransaksiResponse,
-    tags=["Internal-Transaksi"],
-)
-def get_history_transaction(
-    transaction_id: str,
-    db: Session = Depends(get_db),
+# Retrieve semua history transaksi berdasarkan user_id atau transaction_id
+@app.get("/history/transactions/") 
+def get_transactions_by_user_or_id(
+    user_id: Optional[str] = Query(None, description="User ID untuk filter"),
+    transaction_id: Optional[str] = Query(None, description="Transaction ID untuk filter"),
+    db: Session = Depends(get_db)
 ):
-    hist = (
-        db.query(HistoryTransaksi)
-        .filter(HistoryTransaksi.transaction_id == transaction_id)
-        .first()
-    )
-    if not hist:
-        raise HTTPException(status_code=404, detail="History transaksi tidak ditemukan")
-    return hist
-
-
-@app.get(
-    "/internal/history/transaction/user/{user_id}",
-    response_model=List[HistoryTransaksiResponse],
-    tags=["Internal-Transaksi"],
-)
-def list_history_transaction_by_user(
-    user_id: str,
-    db: Session = Depends(get_db),
-):
-    rows = (
-        db.query(HistoryTransaksi)
-        .filter(HistoryTransaksi.user_id == user_id)
-        .order_by(HistoryTransaksi.created_at.desc())
-        .all()
-    )
-    return rows
+    query = db.query(HistoryTransaksi)
+    
+    if user_id:
+        query = query.filter(HistoryTransaksi.user_id == user_id)
+    if transaction_id:
+        query = query.filter(HistoryTransaksi.transaction_id == transaction_id)
+    
+    histories = query.all()
+    
+    if not histories:
+        raise HTTPException(status_code=404, detail="No transaction histories found for the given criteria")
+    
+    return histories
 
 
 # =============== GRAPHQL SCHEMA ===============

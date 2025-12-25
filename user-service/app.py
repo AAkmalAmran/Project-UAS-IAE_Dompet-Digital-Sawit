@@ -152,8 +152,13 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     validate_email(data.email)
     validate_password(data.password)
 
+    # Cek apakah Email sudah ada
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email sudah terdaftar")
+
+    # TAMBAHAN: Cek apakah Username sudah ada
+    if db.query(User).filter(User.username == data.username).first():
+        raise HTTPException(status_code=400, detail="Username sudah digunakan")
 
     user = User(
         username=data.username,

@@ -65,6 +65,12 @@ class FraudCheckRequest(BaseModel):
     amount: float
     ip_address: Optional[str] = None
 
+class FraudCheckResponse(BaseModel):
+    user_id: str
+    amount: float
+    status: FraudStatus
+    reason: str
+
 # ================= GRAPHQL SCHEMA & RESOLVERS =================
 
 type_defs = """
@@ -240,6 +246,12 @@ def check_fraud_rest(req: FraudCheckRequest, db: Session = Depends(get_db)):
         "reason": reason,
         "log_id": new_log.log_id
     }
+
+# tampilkan data 
+@app.get("/logs", response_model=List[FraudCheckResponse])
+def get_fraud_logs(db: Session = Depends(get_db)):
+    logs = db.query(FraudLog).all()
+    return logs
 
 if __name__ == "__main__":
     import uvicorn
