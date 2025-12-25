@@ -43,6 +43,7 @@ Base = declarative_base()
 # URL Microservices
 WALLET_SERVICE_URL = os.getenv("WALLET_SERVICE_URL", "http://wallet-service:8002")
 FRAUD_SERVICE_URL = os.getenv("FRAUD_SERVICE_URL", "http://fraud-service:8004")
+HISTORY_SERVICE_URL = os.getenv("HISTORY_SERVICE_URL", "http://history-service:8005")
 
 # ================= Models =================
 # [FIX] Tambahkan 'str' agar Enum diperlakukan sebagai string juga oleh SQLAlchemy
@@ -123,6 +124,23 @@ async def check_fraud_status(user_id: str, amount: float):
         except Exception as e:
             print(f"Fraud check error: {e}")
     return {"is_fraud": False, "reason": "Service unreachable"}
+
+async def log_transaction_history(transaction_data: dict):
+    try:
+        print(f"Sending request to history-service: {transaction_data}")  # Tambah logging untuk debug
+        response = httpx.post(
+            f"{HISTORY_SERVICE_URL}/internal/history/transaction",
+            json=transaction_data,
+            timeout=10.0
+        )
+        response.raise_for_status()
+        print(f"History log success: {response.status_code}")
+    except httpx.HTTPStatusError as e:
+        print(f"HTTP error logging to history: {e.response.status_code} - {e.response.text}")
+        raise
+    except Exception as e:
+        print(f"Error logging to history: {str(e)}")
+        raise
 
 async def call_external_api_group(order_id: str, amount: float):
     print(f"📡 [MOCK] Calling External API... Order: {order_id}, Amount: {amount}")
@@ -291,6 +309,22 @@ async def resolve_create_transaction(_, info, input):
         amount=input["amount"],
         description=input.get("description")
     )
+
+    # Log to History Service
+    history_log = {
+        "transaction_id": new_transaction.transaction_id or str(uuid.uuid4()),  # Pastikan string, generate jika None
+        "user_id": new_transaction.user_id,
+        "wallet_id": new_transaction.wallet_id,
+        "wallet_name": new_transaction.wallet_name,
+        "transaction_type": new_transaction.transaction_type.value,
+        "order_id": new_transaction.order_id,
+        "amount": new_transaction.amount,
+        "description": new_transaction.description,
+        "transaction_created_at": (new_transaction.created_at or datetime.utcnow()).isoformat(),
+        "status": new_transaction.status or "completed"  # Pastikan string, default jika None
+    }
+    await log_transaction_history(history_log)
+
     db.add(new_transaction)
     db.commit()
     db.refresh(new_transaction)
@@ -365,6 +399,21 @@ async def create_transaction(transaction: TransactionCreate, token: dict = Depen
     db.add(db_trx)
     db.commit()
     db.refresh(db_trx)
+
+    # Log to History Service
+    history_log = {
+        "transaction_id": db_trx.transaction_id or str(uuid.uuid4()),  # Pastikan string, generate jika None
+        "user_id": db_trx.user_id,
+        "wallet_id": db_trx.wallet_id,
+        "wallet_name": db_trx.wallet_name,
+        "transaction_type": db_trx.transaction_type.value,
+        "order_id": db_trx.order_id,
+        "amount": db_trx.amount,
+        "description": db_trx.description,
+        "transaction_created_at": (db_trx.created_at or datetime.utcnow()).isoformat(),
+        "status": db_trx.status or "completed"  # Pastikan string, default jika None
+    }
+    await log_transaction_history(history_log)
     
     await update_wallet_balance(transaction.wallet_id, transaction.amount, transaction.transaction_type.value)
     return db_trx
