@@ -63,9 +63,6 @@ class CreateHistoryReq(BaseModel):
 
 @app.post("/rest/history", tags=["REST"])
 def create_history_rest(req: CreateHistoryReq, user=Depends(verify_token), db: Session = Depends(get_db)):
-    """
-    Wajib ada Token. Transaction Service harus forward token user saat call endpoint ini.
-    """
     h = History(
         transaction_id=req.transaction_id,
         user_id=req.user_id,
@@ -80,11 +77,23 @@ def create_history_rest(req: CreateHistoryReq, user=Depends(verify_token), db: S
 
 @app.get("/rest/history/me", tags=["REST"])
 def get_my_history_rest(user=Depends(verify_token), db: Session = Depends(get_db)):
-    """
-    Hanya bisa melihat history milik user yang sedang login
-    """
     user_id = str(user["user_id"])
-    return db.query(History).filter(History.user_id == user_id).all()
+    return db.query(History).filter(History.user_id == user_id).order_by(History.created_at.desc()).all()
+
+# [BARU] Endpoint REST untuk hapus history
+@app.delete("/rest/history/{history_id}", tags=["REST"])
+def delete_history_item_rest(history_id: str, user=Depends(verify_token), db: Session = Depends(get_db)):
+    user_id = str(user["user_id"])
+    
+    # Cari history yang ID-nya cocok DAN milik user yang sedang login
+    item = db.query(History).filter(History.history_id == history_id, History.user_id == user_id).first()
+    
+    if not item:
+        raise HTTPException(status_code=404, detail="History not found or access denied")
+    
+    db.delete(item)
+    db.commit()
+    return {"status": "deleted", "history_id": history_id}
 
 # ================= GRAPHQL WRAPPER =================
 type_defs = """
@@ -101,9 +110,14 @@ type_defs = """
     type Query {
         myHistory: [History]
     }
+
+    type Mutation {
+        deleteHistory(historyId: String!): Boolean
+    }
 """
 
 query = QueryType()
+mutation = MutationType()
 LOCAL_URL = "http://localhost:8005"
 
 @query.field("myHistory")
@@ -112,7 +126,6 @@ async def resolve_history(_, info):
     auth_header = request.headers.get("Authorization")
 
     async with httpx.AsyncClient() as client:
-        # Forward token ke endpoint /me
         resp = await client.get(
             f"{LOCAL_URL}/rest/history/me",
             headers={"Authorization": auth_header}
@@ -129,7 +142,23 @@ async def resolve_history(_, info):
             } for h in data
         ]
 
-schema = make_executable_schema(type_defs, query)
+# [BARU] Resolver untuk delete history
+@mutation.field("deleteHistory")
+async def resolve_delete(_, info, historyId):
+    request = info.context["request"]
+    auth_header = request.headers.get("Authorization")
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.delete(
+            f"{LOCAL_URL}/rest/history/{historyId}",
+            headers={"Authorization": auth_header}
+        )
+        
+        # Jika status 200 OK, berarti berhasil dihapus
+        return resp.status_code == 200
+
+# Compile Schema
+schema = make_executable_schema(type_defs, query, mutation)
 
 @app.on_event("startup")
 def startup(): Base.metadata.create_all(bind=engine)

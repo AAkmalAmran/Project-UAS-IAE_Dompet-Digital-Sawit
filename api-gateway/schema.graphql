@@ -21,19 +21,26 @@ type Wallet {
 }
 
 # --- TRANSACTION TYPES ---
+enum TransactionType {
+  DEPOSIT
+  PAYMENT
+  TRANSFER
+}
+
 type Transaction {
     transactionId: String
     userId: String
     walletId: String
     amount: Float
-    type: String
+    type: TransactionType
     status: String
     createdAt: String
 }
 input TransactionInput {
     walletId: String!
     amount: Float!
-    type: String!
+    type: TransactionType!
+    vaNumber: String
 }
 
 # --- HISTORY TYPES ---
@@ -65,6 +72,11 @@ input CheckFraudInput {
     userId: String!
     amount: Float!
 }
+input UpdateFraudInput {
+        logId: String!
+        status: String!
+        reason: String
+}
 
 type Query {
     # User (Butuh Token)
@@ -88,12 +100,17 @@ type Mutation {
     registerUser(username: String!, fullname: String!, email: String!, password: String!): String
     loginUser(email: String!, password: String!): LoginResponse
     
-    # Wallet (Butuh Token)
+    # Wallet
     createWallet(walletName: String!): Wallet
     
-    # Transaction (Butuh Token)
+    # Transaction
     createTransaction(input: TransactionInput!): Transaction
     
-    # Fraud (Butuh Token)
+    # Fraud
     checkFraud(input: CheckFraudInput!): FraudCheckResult
+    updateFraudLog(input: UpdateFraudInput!): FraudLog
+    deleteFraudLog(logId: String!): String
+
+    # History
+    deleteHistory(historyId: String!): Boolean
 }
