@@ -113,6 +113,16 @@ async def resolve_history(_, info):
     data = await forward_request(HISTORY_SRV_URL, q, {}, info.context["request"])
     return data["myHistory"]
 
+@mutation.field("deleteHistory")
+async def resolve_delete(_, info, historyId):
+    q = """
+        mutation($id: String!) {
+            deleteHistory(historyId: $id)
+        }
+    """
+    data = await forward_request(HISTORY_SRV_URL, q, {"id": historyId}, info.context["request"])
+    return data["deleteHistory"]
+
 # --- FRAUD SERVICE ---
 @query.field("getFraudLogs")
 async def resolve_fraud_logs(_, info):
