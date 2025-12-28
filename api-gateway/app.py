@@ -130,6 +130,26 @@ async def resolve_check_fraud(_, info, input):
     data = await forward_request(FRAUD_SRV_URL, q, {"i": input}, info.context["request"])
     return data["checkFraud"]
 
+@mutation.field("updateFraudLog")
+async def resolve_update_fraud_log(_, info, input):
+    q = """
+        mutation($i: UpdateFraudInput!) {
+            updateFraudLog(input: $i) { logId status reason }
+        }
+    """
+    data = await forward_request(FRAUD_SRV_URL, q, {"i": input}, info.context["request"])
+    return data["updateFraudLog"]
+
+@mutation.field("deleteFraudLog")
+async def resolve_delete_fraud_log(_, info, logId):
+    q = """
+        mutation($l: String!) {
+            deleteFraudLog(logId: $l)
+        }
+    """
+    data = await forward_request(FRAUD_SRV_URL, q, {"l": logId}, info.context["request"])
+    return data["deleteFraudLog"]
+
 # ================= APP SETUP =================
 schema = make_executable_schema(type_defs, query, mutation)
 app = FastAPI(title="API Gateway (Unified GraphQL)")
