@@ -22,7 +22,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./transactions.db")
 WALLET_SERVICE_URL = os.getenv("WALLET_SERVICE_URL", "http://wallet-service:8002")
 FRAUD_SERVICE_URL = os.getenv("FRAUD_SERVICE_URL", "http://fraud-service:8004")
 HISTORY_SERVICE_URL = os.getenv("HISTORY_SERVICE_URL", "http://history-service:8005")
-EXTERNAL_ORDER_SERVICE_URL = "http://host.docker.internal:6003/graphql" # BlackDoctrine
+EXTERNAL_ORDER_SERVICE_URL = "http://host.docker.internal:7003/graphql" # BlackDoctrine
 
 # Auth Configuration
 ALGORITHM = os.getenv("ALGORITHM", "RS256")
