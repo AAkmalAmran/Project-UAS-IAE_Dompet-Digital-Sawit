@@ -1,16 +1,44 @@
-# Dompet Digital Sawit - Full Native GraphQL Microservices
+# Dompet Digital Sawit - Microservices
+
+---
 
 ## Deskripsi Proyek
 
-**Dompet Digital Sawit** adalah sistem layanan keuangan digital berbasis arsitektur *microservices*. Berbeda dengan versi sebelumnya, versi ini menerapkan arsitektur **Full Native GraphQL**.
+**Dompet Digital Sawit** adalah sistem layanan keuangan digital yang dibangun menggunakan arsitektur **Microservices** terdistribusi dengan penerapan **Independent JWT Authentication**.
 
-Setiap layanan (*microservice*) memiliki **GraphQL Server** sendiri yang langsung menangani *Query* dan *Mutation*. Komunikasi antar layanan (contoh: *Transaction Service* memanggil *Wallet Service*) juga dilakukan menggunakan protokol GraphQL.
+Proyek ini dirancang untuk menjawab tantangan arsitektur monolitik tradisional dengan memecah sistem menjadi layanan-layanan yang otonom, terisolasi, dan saling berkomunikasi menggunakan protokol **GraphQL** di atas HTTP. Setiap layanan berjalan dalam kontainer terpisah (Docker) dan memiliki basis data masing-masing (*Database-per-Service*) untuk menjamin independensi data dan mencegah kegagalan sistem secara menyeluruh (*Single Point of Failure*).
 
-**Fitur Utama:**
-1.  **Full GraphQL:** Semua layanan mengekspos endpoint `/graphql`.
-2.  **API Gateway Proxy:** Gateway bertindak sebagai *router* pintar yang meneruskan query klien ke layanan yang tepat.
-3.  **Inter-Service GraphQL Communication:** Layanan saling bertukar data menggunakan *query/mutation* GraphQL.
-4.  **External Integration:** Terintegrasi dengan sistem Marketplace luar (*BlackDoctrine*) untuk pembayaran via Virtual Account.
+Sistem ini bertindak sebagai *Service Provider* yang menangani pemrosesan transaksi pembayaran, manajemen saldo, validasi keamanan (Fraud Detection), serta pencatatan audit, dan terintegrasi dengan sistem eksternal (Marketplace) secara *real-time*.
+
+### Fitur & Karakteristik Utama
+
+1. **Arsitektur Microservices Terdistribusi:**
+Sistem terdiri dari lima layanan utama yang memiliki tanggung jawab spesifik:
+    * **User Service (Auth):** Mengelola identitas pengguna dan keamanan berbasis *Independent JWT Authentication* menggunakan algoritma asimetris RS256.
+
+
+    * **Transaction Service:** Bertindak sebagai *Payment Gateway* dan orkestrator yang mengatur alur pembayaran dari inisiasi hingga penyelesaian.
+
+
+    * **Wallet Service:** Mengelola penyimpanan dana (*Fund Manager*) dan memastikan integritas saldo pengguna secara atomik.
+
+
+    * **Fraud Detection Service:** Mesin keamanan yang memvalidasi risiko transaksi dan mencegah aktivitas mencurigakan atau penipuan.
+
+
+    * **History Service:** Layanan pencatatan audit (*Audit Trail*) yang menyimpan riwayat mutasi transaksi untuk kebutuhan pelaporan.
+
+
+2. **Full Native GraphQL Communication:**
+Seluruh komunikasi antar-layanan (Inter-service) maupun dengan klien eksternal dilakukan menggunakan *Query* dan *Mutation* GraphQL, memberikan kontrak data yang eksplisit dan fleksibel.
+
+
+3. **API Gateway Proxy:**
+Menggunakan Gateway sebagai pintu masuk tunggal (*Entry Point*) yang meneruskan permintaan klien ke layanan mikro yang relevan.
+
+
+4. **Integrasi Eksternal (Marketplace):**
+Sistem menyediakan endpoint publik untuk memproses pembayaran dari aplikasi Marketplace luar (seperti *BlackDoctrine*), memvalidasi tagihan via Virtual Account, dan memberikan respon status pelunasan secara otomatis.
 
 ---
 
@@ -120,6 +148,30 @@ Semua layanan mengekspos endpoint GraphQL di path `/graphql`.
 | Transactions Service | 8003 | Native GraphQL | `transactions.db` |
 | Fraud Service | 8004 | Native GraphQL | `fraud.db` |
 | History Service | 8005 | Native GraphQL | `history.db` |
+
+---
+
+## Daftar Operasi GraphQL
+
+Berikut adalah daftar lengkap Query dan Mutation yang tersedia di sistem. Semua request dikirim ke `http://localhost:8000/graphql`.
+
+| Service | Tipe | Nama Operation | Deskripsi & Parameter Input |
+| :--- | :--- | :--- | :--- |
+| **User Service** | Mutation | `registerUser` | Mendaftarkan pengguna baru.<br>*(Input: username, fullname, email, password)* |
+| | Mutation | `loginUser` | Login untuk mendapatkan token akses (JWT).<br>*(Input: email, password)* |
+| | Query | `myProfile` | Mengambil profil pengguna saat ini.<br>*(Input: token)* |
+| **Wallet Service** | Mutation | `createWallet` | Membuat dompet digital baru.<br>*(Input: walletName)* |
+| | Mutation | `topupWallet` | Menambah saldo dompet (Deposit).<br>*(Input: walletId, amount)* |
+| | Mutation | `deductWallet` | Mengurangi saldo (Pembayaran/Transfer).<br>*(Input: walletId, amount)* |
+| | Query | `myWallets` | Melihat daftar dompet dan saldo milik pengguna. |
+| **Transaction Service** | Mutation | `createTransaction` | Memproses transaksi baru.<br>*(Input: walletId, amount, type [DEPOSIT/PAYMENT/TRANSFER], vaNumber [opsional])* |
+| | Query | `myTransactions` | Melihat riwayat transaksi pengguna. |
+| **Fraud Service** | Mutation | `checkFraud` | Mengecek risiko transaksi (Internal).<br>*(Input: userId, amount)* |
+| | Mutation | `deleteFraudLog` | Menghapus log deteksi fraud (Admin Only).<br>*(Input: logId)* |
+| | Query | `getFraudLogs` | Melihat seluruh log deteksi fraud (Admin Only). |
+| **History Service** | Mutation | `addHistory` | Mencatat log riwayat mutasi baru.<br>*(Input: HistoryInput)* |
+| | Mutation | `deleteHistory` | Menghapus catatan riwayat tertentu.<br>*(Input: historyId)* |
+| | Query | `myHistory` | Mengambil daftar lengkap riwayat mutasi pengguna. |
 
 ---
 
@@ -234,7 +286,26 @@ mutation {
 
 ```
 
-### 4. Admin & Fraud
+### 4. Riwayat (History)
+
+*Gunakan Header:* `Authorization: Bearer <TOKEN_ANDA>`
+
+**Cek riwayat transaksi:**
+
+```graphql
+query cekHistori{
+  myHistory {
+    historyId
+    transactionId
+    amount
+    type
+    status
+    createdAt
+  }
+}
+```
+
+### 5. Admin & Fraud
 
 *Login dengan akun admin (lihat `.env` user-service) untuk akses ini.*
 
