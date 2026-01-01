@@ -29,7 +29,7 @@ Arsitektur sistem ini terdiri dari beberapa komponen utama:
 flowchart TB
     Client["Client (Frontend/Postman)"] -- GraphQL Query/Mutation --> Gateway["API Gateway (Port 8000)"]
     
-    subgraph Services ["Backend Microservices (REST API)"]
+    subgraph Services ["Backend Microservices"]
         User["User Service :8001"]
         Wallet["Wallet Service :8002"]
         Trx["Transactions Service :8003"]
@@ -74,9 +74,12 @@ Salin file .env.example menjadi .env di setiap folder service.
 * fraud-service/.env
 * history-service/.env
 
-2. open gitbash, run ('cd user-service')
+2. Buka GitBash dan jalankan:
+```bash
+ cd user-service
+```
    
-4. Jalankan
+4. Membuat private.pem dan public.pem, Jalankan:
 ```bash
  openssl genrsa -out private.pem 2048
 ```
@@ -85,9 +88,9 @@ Salin file .env.example menjadi .env di setiap folder service.
  openssl rsa -in private.pem -pubout -out public.pem
 ``` 
 
-4. Copy file public.pem from user-service
+4. Copy file public.pem dari user-service
 
-6. Paste file public.pem from user-service to each services
+6. Paste file public.pem dari user-service ke tiap service
 
 8. Navigate to the project root
 
@@ -103,13 +106,13 @@ docker-compose up --build -d
 ```
 
 
-4. Akses GraphQL Playground
-Setelah semua service berjalan, buka browser dan akses URL berikut untuk menguji API:
+11. Akses GraphQL Playground
+Setelah semua service berjalan, buka browser dan akses URL berikut untuk menguji sistem:
 http://localhost:8000/graphql
 
 ---
 
-## Ringkasan Endpoint & Port
+## Ringkasan Port
 
 Berikut adalah daftar port untuk setiap layanan:
 
@@ -135,7 +138,7 @@ Register User:
 ```graphql
 mutation {
   registerUser(
-    username: "naruto", 
+    username: "narto", 
     fullname: "Naruto Uzumaki", 
     email: "naruto@gmail.com", 
     password: "password123"
@@ -277,6 +280,11 @@ query {
 * Auth: Python-Jose (JWT dengan RSA256)
 * Containerization: Docker & Docker Compose
 
-```
+## Anggota Kelompok & Peran
 
-```
+| Nama             | NIM   | Peran                                    |
+| ---------------- | ----- | ---------------------------------------- |
+| AHMAD AKMAL AMRAN | 102022300010 | Transactions-Service |
+| FIRDAUS AL HAMID | 102022300403 | Wallet-Service |
+| ILHAM FAHMI | 102022300223 | Fraud-Service |
+| DHYDO ARYO JAYANATA | 102022300370 | History-Service |
