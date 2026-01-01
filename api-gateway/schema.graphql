@@ -1,17 +1,19 @@
-# --- USER TYPES ---
-type UserProfile {
+# ================= USER SERVICE =================
+type User {
     user_id: ID
     username: String
+    fullname: String
     email: String
     role: String
 }
+
 type LoginResponse {
     access_token: String
     token_type: String
-    user: UserProfile
+    user: User
 }
 
-# --- WALLET TYPES ---
+# ================= WALLET SERVICE =================
 type Wallet {
     walletId: String
     userId: String
@@ -20,11 +22,11 @@ type Wallet {
     status: String
 }
 
-# --- TRANSACTION TYPES ---
+# ================= TRANSACTION SERVICE =================
 enum TransactionType {
-  DEPOSIT
-  PAYMENT
-  TRANSFER
+    DEPOSIT
+    PAYMENT
+    TRANSFER
 }
 
 type Transaction {
@@ -33,9 +35,11 @@ type Transaction {
     walletId: String
     amount: Float
     type: TransactionType
+    vaNumber: String
     status: String
     createdAt: String
 }
+
 input TransactionInput {
     walletId: String!
     amount: Float!
@@ -43,7 +47,16 @@ input TransactionInput {
     vaNumber: String
 }
 
-# --- HISTORY TYPES ---
+# ================= FRAUD SERVICE =================
+type FraudLog {
+    logId: String
+    userId: String
+    amount: Float
+    status: String
+    reason: String
+}
+
+# ================= HISTORY SERVICE =================
 type History {
     historyId: String
     transactionId: String
@@ -54,63 +67,39 @@ type History {
     createdAt: String
 }
 
-# --- FRAUD TYPES ---
-type FraudLog {
-    logId: String
-    userId: String
-    amount: Float
-    status: String
-    reason: String
-}
-type FraudCheckResult {
-    is_fraud: Boolean
-    status: String
-    reason: String
-    log_id: String
-}
-input CheckFraudInput {
-    userId: String!
-    amount: Float!
-}
-input UpdateFraudInput {
-        logId: String!
-        status: String!
-        reason: String
-}
-
+# ================= ROOT QUERY =================
 type Query {
-    # User (Butuh Token)
-    myProfile(token: String!): UserProfile
+    # --- User ---
+    myProfile(token: String!): User
     
-    # Wallet (Butuh Token)
+    # --- Wallet ---
     myWallets: [Wallet]
     
-    # Transaction (Butuh Token)
+    # --- Transaction ---
     myTransactions: [Transaction]
     
-    # History (Butuh Token)
-    myHistory: [History]
-    
-    # Fraud (Butuh Token Admin)
+    # --- Fraud (Admin Only) ---
     getFraudLogs: [FraudLog]
+    
+    # --- History ---
+    myHistory: [History]
 }
 
+# ================= ROOT MUTATION =================
 type Mutation {
-    # User (Public)
+    # --- User ---
     registerUser(username: String!, fullname: String!, email: String!, password: String!): String
     loginUser(email: String!, password: String!): LoginResponse
     
-    # Wallet
+    # --- Wallet ---
     createWallet(walletName: String!): Wallet
     
-    # Transaction
+    # --- Transaction ---
     createTransaction(input: TransactionInput!): Transaction
     
-    # Fraud
-    checkFraud(input: CheckFraudInput!): FraudCheckResult
-    updateFraudLog(input: UpdateFraudInput!): FraudLog
+    # --- Fraud (Admin Only) ---
     deleteFraudLog(logId: String!): String
-
-    # History
+    
+    # --- History ---
     deleteHistory(historyId: String!): Boolean
 }
