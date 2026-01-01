@@ -135,10 +135,10 @@ Register User:
 ```graphql
 mutation {
   registerUser(
-    username: "akmal", 
-    fullname: "Akmal Amran", 
-    email: "akmal@test.com", 
-    password: "123"
+    username: "naruto", 
+    fullname: "Naruto Uzumaki", 
+    email: "naruto@gmail.com", 
+    password: "password123"
   )
 }
 
@@ -148,7 +148,7 @@ Login User:
 
 ```graphql
 mutation {
-  loginUser(email: "akmal@test.com", password: "123") {
+  loginUser(email: "naruto@gmail.com", password: "password123") {
     access_token
     user {
       username
@@ -219,7 +219,7 @@ mutation {
     walletId: "ID_WALLET_ANDA",
     amount: 20000,
     type: PAYMENT,
-    vaNumber: "12345678"
+    vaNumber: "VA_DARI_MARKETPLACE"
   }) {
     transactionId
     status
@@ -234,6 +234,21 @@ Admin dapat melihat log transaksi yang mencurigakan.
 
 * Transaksi > 10.000.000 = SUSPICIOUS
 * Transaksi > 50.000.000 = FRAUD (Gagal)
+
+Login Admin:
+
+```graphql
+mutation {
+  loginUser(email: "admin@gmail.com", password: "admin12345") {
+    access_token
+    user {
+      username
+      role
+    }
+  }
+}
+
+```
 
 Cek Log (Khusus Admin):
 
