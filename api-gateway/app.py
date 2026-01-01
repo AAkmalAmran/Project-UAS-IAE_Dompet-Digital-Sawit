@@ -1,175 +1,94 @@
 import httpx
 from fastapi import FastAPI, Request
-# Import load_schema_from_path
 from ariadne import QueryType, MutationType, make_executable_schema, load_schema_from_path
 from ariadne.asgi import GraphQL
 import os
 
-# ================= CONFIG URLs =================
-USER_SRV_URL = "http://user-service:8001/graphql"
-WALLET_SRV_URL = "http://wallet-service:8002/graphql"
-TRX_SRV_URL = "http://transactions-service:8003/graphql"
-FRAUD_SRV_URL = "http://fraud-service:8004/graphql"
-HISTORY_SRV_URL = "http://history-service:8005/graphql"
+# URL Service (GraphQL Endpoints)
+USER_URL = "http://user-service:8001/graphql"
+WALLET_URL = "http://wallet-service:8002/graphql"
+TRX_URL = "http://transactions-service:8003/graphql"
+FRAUD_URL = "http://fraud-service:8004/graphql"
+HISTORY_URL = "http://history-service:8005/graphql"
 
-# ================= HELPER: PROXY REQUEST =================
-async def forward_request(url: str, query: str, variables: dict, request: Request):
-    headers = {}
-    auth_header = request.headers.get("Authorization")
-    if auth_header:
-        headers["Authorization"] = auth_header
-
+async def proxy_gql(url, query, vars, req):
+    headers = {"Authorization": req.headers.get("Authorization", "")}
     async with httpx.AsyncClient() as client:
         try:
-            resp = await client.post(url, json={"query": query, "variables": variables}, headers=headers)
-            if resp.status_code != 200:
-                raise Exception(f"Service Error ({resp.status_code}): {resp.text}")
-
-            result = resp.json()
-            if "errors" in result:
-                raise Exception(result["errors"][0]["message"])
-            
-            return result.get("data")
+            resp = await client.post(url, json={"query": query, "variables": vars}, headers=headers)
+            res = resp.json()
+            if "errors" in res: raise Exception(res["errors"][0]["message"])
+            return res["data"]
         except httpx.RequestError:
-            raise Exception("Gagal menghubungi Microservice. Pastikan container berjalan.")
-
-# ================= LOAD SCHEMA DARI FILE =================
-# Pastikan file schema.graphql ada di folder yang sama
-type_defs = load_schema_from_path("schema.graphql")
+            raise Exception("Service Unavailable")
 
 query = QueryType()
 mutation = MutationType()
 
-# ================= RESOLVERS =================
+# --- PROXY RESOLVERS ---
 
-# --- USER SERVICE ---
+# USER
 @query.field("myProfile")
-async def resolve_my_profile(_, info, token):
-    q = "query($t: String!) { myProfile(token: $t) { user_id username email role } }"
-    data = await forward_request(USER_SRV_URL, q, {"t": token}, info.context["request"])
-    return data["myProfile"]
-
-@mutation.field("registerUser")
-async def resolve_register(_, info, username, fullname, email, password):
-    q = """
-        mutation($u: String!, $f: String!, $e: String!, $p: String!) {
-            registerUser(username: $u, fullname: $f, email: $e, password: $p)
-        }
-    """
-    vars = {"u": username, "f": fullname, "e": email, "p": password}
-    data = await forward_request(USER_SRV_URL, q, vars, info.context["request"])
-    return data["registerUser"]
+async def r_prof(_, info, token):
+    q = "query($t: String!) { myProfile(token: $t) { user_id username fullname email role } }"
+    return (await proxy_gql(USER_URL, q, {"t": token}, info.context["request"]))["myProfile"]
 
 @mutation.field("loginUser")
-async def resolve_login(_, info, email, password):
-    q = """
-        mutation($e: String!, $p: String!) {
-            loginUser(email: $e, password: $p) {
-                access_token token_type user { user_id username email role }
-            }
-        }
-    """
-    data = await forward_request(USER_SRV_URL, q, {"e": email, "p": password}, info.context["request"])
-    return data["loginUser"]
+async def r_login(_, info, email, password):
+    q = "mutation($e: String!, $p: String!) { loginUser(email: $e, password: $p) { access_token token_type user { user_id username email role } } }"
+    return (await proxy_gql(USER_URL, q, {"e": email, "p": password}, info.context["request"]))["loginUser"]
 
-# --- WALLET SERVICE ---
+@mutation.field("registerUser")
+async def r_reg(_, info, username, fullname, email, password):
+    q = "mutation($u: String!, $f: String!, $e: String!, $p: String!) { registerUser(username: $u, fullname: $f, email: $e, password: $p) }"
+    return (await proxy_gql(USER_URL, q, {"u": username, "f": fullname, "e": email, "p": password}, info.context["request"]))["registerUser"]
+
+# WALLET
 @query.field("myWallets")
-async def resolve_wallets(_, info):
+async def r_wallets(_, info):
     q = "{ myWallets { walletId userId walletName balance status } }"
-    data = await forward_request(WALLET_SRV_URL, q, {}, info.context["request"])
-    return data["myWallets"]
+    return (await proxy_gql(WALLET_URL, q, {}, info.context["request"]))["myWallets"]
 
 @mutation.field("createWallet")
-async def resolve_create_wallet(_, info, walletName):
-    q = """
-        mutation($n: String!) {
-            createWallet(walletName: $n) { walletId userId walletName balance status }
-        }
-    """
-    data = await forward_request(WALLET_SRV_URL, q, {"n": walletName}, info.context["request"])
-    return data["createWallet"]
+async def r_create_wallet(_, info, walletName):
+    q = "mutation($n: String!) { createWallet(walletName: $n) { walletId userId walletName balance status } }"
+    return (await proxy_gql(WALLET_URL, q, {"n": walletName}, info.context["request"]))["createWallet"]
 
-# --- TRANSACTION SERVICE ---
+# TRANSACTION
 @query.field("myTransactions")
-async def resolve_my_trx(_, info):
-    q = "{ myTransactions { transactionId userId walletId amount type status createdAt } }"
-    data = await forward_request(TRX_SRV_URL, q, {}, info.context["request"])
-    return data["myTransactions"]
+async def r_trx(_, info):
+    q = "{ myTransactions { transactionId userId walletId amount type status vaNumber createdAt } }"
+    return (await proxy_gql(TRX_URL, q, {}, info.context["request"]))["myTransactions"]
 
 @mutation.field("createTransaction")
-async def resolve_create_trx(_, info, input):
-    q = """
-        mutation($i: TransactionInput!) {
-            createTransaction(input: $i) { transactionId userId walletId amount type status createdAt }
-        }
-    """
-    data = await forward_request(TRX_SRV_URL, q, {"i": input}, info.context["request"])
-    return data["createTransaction"]
+async def r_create_trx(_, info, input):
+    q = "mutation($i: TransactionInput!) { createTransaction(input: $i) { transactionId userId walletId amount type status vaNumber createdAt } }"
+    return (await proxy_gql(TRX_URL, q, {"i": input}, info.context["request"]))["createTransaction"]
 
-# --- HISTORY SERVICE ---
+# FRAUD & HISTORY
+@query.field("getFraudLogs")
+async def r_fraud(_, info):
+    q = "{ getFraudLogs { logId userId amount status reason } }"
+    return (await proxy_gql(FRAUD_URL, q, {}, info.context["request"]))["getFraudLogs"]
+
 @query.field("myHistory")
-async def resolve_history(_, info):
+async def r_hist(_, info):
     q = "{ myHistory { historyId transactionId userId amount type status createdAt } }"
-    data = await forward_request(HISTORY_SRV_URL, q, {}, info.context["request"])
-    return data["myHistory"]
+    return (await proxy_gql(HISTORY_URL, q, {}, info.context["request"]))["myHistory"]
 
 @mutation.field("deleteHistory")
-async def resolve_delete(_, info, historyId):
-    q = """
-        mutation($id: String!) {
-            deleteHistory(historyId: $id)
-        }
-    """
-    data = await forward_request(HISTORY_SRV_URL, q, {"id": historyId}, info.context["request"])
-    return data["deleteHistory"]
-
-# --- FRAUD SERVICE ---
-@query.field("getFraudLogs")
-async def resolve_fraud_logs(_, info):
-    q = "{ getFraudLogs { logId userId amount status reason } }"
-    data = await forward_request(FRAUD_SRV_URL, q, {}, info.context["request"])
-    return data["getFraudLogs"]
-
-@mutation.field("checkFraud")
-async def resolve_check_fraud(_, info, input):
-    q = """
-        mutation($i: CheckFraudInput!) {
-            checkFraud(input: $i) { is_fraud status reason log_id }
-        }
-    """
-    data = await forward_request(FRAUD_SRV_URL, q, {"i": input}, info.context["request"])
-    return data["checkFraud"]
-
-@mutation.field("updateFraudLog")
-async def resolve_update_fraud_log(_, info, input):
-    q = """
-        mutation($i: UpdateFraudInput!) {
-            updateFraudLog(input: $i) { logId status reason }
-        }
-    """
-    data = await forward_request(FRAUD_SRV_URL, q, {"i": input}, info.context["request"])
-    return data["updateFraudLog"]
+async def r_del_hist(_, info, historyId):
+    return (await proxy_gql(HISTORY_URL, "mutation($h: String!) { deleteHistory(historyId: $h) }", {"h": historyId}, info.context["request"]))["deleteHistory"]
 
 @mutation.field("deleteFraudLog")
-async def resolve_delete_fraud_log(_, info, logId):
-    q = """
-        mutation($l: String!) {
-            deleteFraudLog(logId: $l)
-        }
-    """
-    data = await forward_request(FRAUD_SRV_URL, q, {"l": logId}, info.context["request"])
-    return data["deleteFraudLog"]
+async def r_del_fraud(_, info, logId):
+    return (await proxy_gql(FRAUD_URL, "mutation($l: String!) { deleteFraudLog(logId: $l) }", {"l": logId}, info.context["request"]))["deleteFraudLog"]
 
-# ================= APP SETUP =================
+
+type_defs = load_schema_from_path("schema.graphql")
 schema = make_executable_schema(type_defs, query, mutation)
-app = FastAPI(title="API Gateway (Unified GraphQL)")
-
-@app.get("/health")
-def health():
-    return {"status": "Gateway Healthy", "port": 8000}
-
+app = FastAPI(title="Gateway")
 app.add_route("/graphql", GraphQL(schema, debug=True))
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
