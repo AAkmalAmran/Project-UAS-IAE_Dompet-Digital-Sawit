@@ -113,14 +113,14 @@ http://localhost:8000/graphql
 
 Berikut adalah daftar port untuk setiap layanan:
 
-| Service | Port (Host) | Tipe API Internal | Database |
-| --- | --- | --- | --- |
-| API Gateway | 8000 | GraphQL | - |
-| User Service | 8001 | REST | users.db |
-| Wallet Service | 8002 | REST | wallets.db |
-| Transactions Service | 8003 | REST | transactions.db |
-| Fraud Service | 8004 | REST | fraud.db |
-| History Service | 8005 | REST | history.db |
+| Service | Port (Host) | Database |
+| --- | --- | --- |
+| API Gateway | 8000 | - |
+| User Service | 8001 | users.db |
+| Wallet Service | 8002 | wallets.db |
+| Transactions Service | 8003 | transactions.db |
+| Fraud Service | 8004 | fraud.db |
+| History Service | 8005 | history.db |
 
 ---
 
