@@ -36,7 +36,7 @@ flowchart TB
         DB5[("history.db")]
     end
 
-    subgraph External ["External System"]
+    subgraph External ["External Integration"]
         Marketplace["Marketplace API (BlackDoctrine)"]
     end
 
@@ -56,14 +56,7 @@ flowchart TB
     Fraud --> DB4
     History --> DB5
 
-    style Gateway fill:#FFD600,color:#000000,stroke:#000
-    style Client fill:#00C853,color:#000000
-    style Services fill:#BBDEFB
-    style External fill:#ffcccc,stroke:#333,stroke-dasharray: 5 5
-
 ```
-
----
 
 ## Cara Menjalankan Proyek
 
