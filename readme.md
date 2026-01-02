@@ -92,13 +92,10 @@ Ikuti langkah-langkah berikut untuk menjalankan sistem secara lokal menggunakan 
 
 ### 1. Persiapan Environment
 
-Salin file `.env.example` menjadi `.env` di setiap folder service:
+```bash
+python gsetup_env.py
 
-* `Auth-service/.env`
-* `wallet-service/.env`
-* `transactions-service/.env`
-* `fraud-service/.env`
-* `history-service/.env`
+```
 
 ### 2. Generate RSA Keys (Otomatis)
 
