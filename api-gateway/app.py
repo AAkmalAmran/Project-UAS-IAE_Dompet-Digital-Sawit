@@ -5,7 +5,7 @@ from ariadne.asgi import GraphQL
 import os
 
 # URL Service (GraphQL Endpoints)
-USER_URL = "http://user-service:8001/graphql"
+USER_URL = "http://auth-service:8001/graphql"
 WALLET_URL = "http://wallet-service:8002/graphql"
 TRX_URL = "http://transactions-service:8003/graphql"
 FRAUD_URL = "http://fraud-service:8004/graphql"
@@ -27,7 +27,7 @@ mutation = MutationType()
 
 # --- PROXY RESOLVERS ---
 
-# USER
+# AUTH
 @query.field("myProfile")
 async def r_prof(_, info, token):
     q = "query($t: String!) { myProfile(token: $t) { user_id username fullname email role } }"

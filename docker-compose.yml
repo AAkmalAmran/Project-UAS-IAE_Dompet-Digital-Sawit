@@ -2,16 +2,16 @@ version: '3.8'
 
 services:
   # =========================================
-  # 1. USER SERVICE (Penyedia Key & Auth)
+  # 1. AUTH SERVICE (Penyedia Key & Auth)
   # =========================================
-  user-service:
+  auth-service:
     build: 
-      context: ./user-service
-    container_name: user-service
+      context: ./auth-service
+    container_name: auth-service
     ports:
       - "8001:8001"
     volumes:
-      - ./user-service:/app  # Sinkronisasi kode & DB SQLite ke Host
+      - ./auth-service:/app  # Sinkronisasi kode & DB SQLite ke Host
     networks:
       - app-network
 
@@ -26,10 +26,10 @@ services:
       - "8002:8002"
     volumes:
       - ./wallet-service:/app
-      # PENTING: Mount public.pem dari user-service ke sini agar bisa verify token
-      - ./user-service/public.pem:/app/public.pem:ro 
+      # PENTING: Mount public.pem dari auth-service ke sini agar bisa verify token
+      - ./auth-service/public.pem:/app/public.pem:ro 
     depends_on:
-      - user-service
+      - auth-service
     networks:
       - app-network
 
@@ -44,9 +44,9 @@ services:
       - "8003:8003"
     volumes:
       - ./transactions-service:/app
-      - ./user-service/public.pem:/app/public.pem:ro
+      - ./auth-service/public.pem:/app/public.pem:ro
     depends_on:
-      - user-service
+      - auth-service
       - wallet-service
       - fraud-service
       - history-service
@@ -64,9 +64,9 @@ services:
       - "8004:8004"
     volumes:
       - ./fraud-service:/app
-      - ./user-service/public.pem:/app/public.pem:ro
+      - ./auth-service/public.pem:/app/public.pem:ro
     depends_on:
-      - user-service
+      - auth-service
     networks:
       - app-network
 
@@ -81,9 +81,9 @@ services:
       - "8005:8005"
     volumes:
       - ./history-service:/app
-      - ./user-service/public.pem:/app/public.pem:ro
+      - ./auth-service/public.pem:/app/public.pem:ro
     depends_on:
-      - user-service
+      - auth-service
     networks:
       - app-network
 
@@ -99,7 +99,7 @@ services:
     volumes:
       - ./api-gateway:/app
     depends_on:
-      - user-service
+      - auth-service
       - wallet-service
       - transactions-service
       - fraud-service
