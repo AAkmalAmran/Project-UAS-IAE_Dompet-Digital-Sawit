@@ -328,6 +328,8 @@ query {
 
 ---
 ## Tes Integrasi 
+- BlackDoctrine (Marketplace): http://localhost:7001/graphql & http://localhost:7003/graphql
+- Dompet Digital Sawit: http://localhost:8000/graphql
 ### 1. Registrasi Marketplace (7001)
 ```graphql
 mutation RegisterUser($nama: String!, $email: String!, $password: String!) {
@@ -435,6 +437,7 @@ query CekTagihanByVA {
 * **Auth:** JWT (RS256 Algorithm)
 * **Infrastructure:** Docker & Docker Compose
 
+---
 ## Anggota Kelompok
 
 | Nama | NIM | Peran / Service |
