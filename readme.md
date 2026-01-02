@@ -333,68 +333,76 @@ sequenceDiagram
     autonumber
     
     box "BlackDoctrine (Marketplace)" #FFFFFF
-        actor User as Pengguna (Pembeli)
+        actor User as Pengguna
         participant FE as Frontend
         participant Order as Order Service
     end
 
     box "Dompet Digital Sawit" #1E4D2B
         participant Gateway as API Gateway
+        participant Auth as Auth Service
         participant Trans as Transaction Service
         participant Fraud as Fraud Service
         participant Wallet as Wallet Service
+        participant History as History Service
     end
 
-    Note over User, Order: Fase 1: Checkout di Marketplace
+    Note over User, Order: 1. Checkout di BlackDoctrine (Akun A)
 
-    User->>FE: Klik "Bayar" (Checkout)
-    FE->>Order: Mutation CreateOrder(input)
+    User->>FE: Klik "Bayar"
+    FE->>Order: CreateOrder(Items, Total)
     activate Order
-    Order->>Order: Validasi Stok & Harga
-    Order->>Order: Buat Order (Status: PENDING)
-    Order-->>FE: Return OrderID & TotalHarga
+    Order->>Order: Generate VAnumber & Total
+    Order-->>FE: Return (VAnumber, Total, PaymentData)
     deactivate Order
 
-    Note over User, Wallet: Fase 2: Proses Pembayaran
+    Note over User, Auth: 2. Redirection ke Dompet Sawit (Akun B)
 
-    FE->>Gateway: Request Payment (OrderID, Nominal, Token)
+    User->>Gateway: Redirect & Input Credential (Email, Pass)
     activate Gateway
-    Gateway->>User: Minta PIN Keamanan
-    User->>Gateway: Input PIN
-    
-    Gateway->>Trans: ProcessTransaction(Type: PAYMENT)
+    Gateway->>Auth: VerifyCredential(Email, Pass)
+    activate Auth
+    Auth->>Auth: Validate Hash
+    Auth-->>Gateway: Token Valid / Login Sukses
+    deactivate Auth
+
+    Note over Gateway, Wallet: 3. Eksekusi Pembayaran
+
+    Gateway->>Trans: ProcessPayment(Token, VAnumber, Total)
     activate Trans
     
-    rect rgb(255, 255, 255)
-        Note right of Trans: Cek Keamanan & Saldo
-        Trans->>Fraud: CheckFraud(UserID, Amount)
+        Trans->>Fraud: checkFraud(UserID, Total)
         activate Fraud
-        Fraud-->>Trans: Status: SAFE / LOW RISK
+        Fraud->>Fraud: Scoring Analysis
+        Fraud-->>Trans: Result: Transaction SAFE
         deactivate Fraud
 
-        Trans->>Wallet: DebitBalance(UserID, Amount)
+        Trans->>Wallet: DebitSaldo(UserID, Total)
         activate Wallet
-        Wallet->>Wallet: Cek Saldo Cukup?
-        Wallet->>Wallet: Kurangi Saldo
-        Wallet-->>Trans: Saldo Berhasil Terpotong
+        Wallet->>Wallet: Cek Saldo & Lock Amount
+        Wallet-->>Trans: Saldo Berhasil Dipotong
         deactivate Wallet
-    end
+        Trans->>Trans: Update Status Transaksi: SUCCESS
 
-    Trans->>Trans: Simpan Log Transaksi
-    Trans-->>Gateway: Transaksi Berhasil
+        activate History
+        Trans->>History: addHistory()
+        History->>History: saveTransactions()
+        deactivate History
+
+    Trans-->>Gateway: Payment Response (Success)
+
     deactivate Trans
 
-    Note over Gateway, FE: Fase 3: Finalisasi
 
-    par Update Status Paralel
-        Gateway->>Order: Webhook/Callback (Payment Success)
-        activate Order
-        Order->>Order: Update Status Order (PAID)
-        deactivate Order
-    and
-        Gateway-->>FE: Response Sukses
-        FE-->>User: Tampilkan "Pembayaran Berhasil"
-    end
+    Gateway->>Order: Webhook: PaymentSuccess(vaNumber & status)
+
+    activate Order
+    Order->>Order: Update Order Status: PAID
+    Order-->>Gateway: Acknowledge (200 OK)
+    Order-->>FE: Transaksi Sukses
+    deactivate Order
+
+    
     deactivate Gateway
 ```
 ---
