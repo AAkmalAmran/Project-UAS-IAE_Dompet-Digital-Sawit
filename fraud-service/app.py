@@ -13,7 +13,7 @@ from ariadne.asgi import GraphQL
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fraud.db")
-PUBLIC_KEY_PATH = "/app/public.pem"
+PUBLIC_KEY_PATH = os.getenv("PUBLIC_KEY_PATH", "/app/public.pem")
 try:
     with open(PUBLIC_KEY_PATH, "r") as f: PUBLIC_KEY = f.read()
 except: PUBLIC_KEY = ""
@@ -38,11 +38,29 @@ class FraudLog(Base):
 
 def get_current_user(request):
     auth = request.headers.get("Authorization", "")
-    token = auth.replace("Bearer ", "")
+    if not auth:
+        raise Exception("Missing Authorization Header")
+    
+    # Handle case "Bearer <token>" lebih rapi
+    parts = auth.split()
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        token = parts[1]
+    else:
+        # Fallback jika user mengirim token mentah tanpa 'Bearer'
+        token = auth
+        
+    if not token:
+        raise Exception("Token is empty")
+
     try:
+        # Pastikan PUBLIC_KEY tidak kosong
+        if not PUBLIC_KEY:
+             raise Exception("Server Error: Public Key not loaded")
+             
         return jwt.decode(token, PUBLIC_KEY, algorithms=["RS256"])
-    except:
-        raise Exception("Unauthorized")
+    except Exception as e:
+        print(f"Token Decode Error: {e}") # Debugging di log console
+        raise Exception("Unauthorized: Invalid Token")
 
 type_defs = """
     type FraudLog {

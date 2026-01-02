@@ -26,7 +26,6 @@ services:
       - "8002:8002"
     volumes:
       - ./wallet-service:/app
-      # PENTING: Mount public.pem dari auth-service ke sini agar bisa verify token
       - ./auth-service/public.pem:/app/public.pem:ro 
     depends_on:
       - auth-service
