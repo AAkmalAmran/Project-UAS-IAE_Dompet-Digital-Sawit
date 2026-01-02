@@ -327,6 +327,77 @@ query {
 ```
 
 ---
+## Diagram Sequence Integrasi
+```mermaid
+sequenceDiagram
+    autonumber
+    
+    box "BlackDoctrine (Marketplace)" #FFFFFF
+        actor User as Pengguna (Pembeli)
+        participant FE as Frontend
+        participant Order as Order Service
+    end
+
+    box "Dompet Digital Sawit" #1E4D2B
+        participant Gateway as API Gateway
+        participant Trans as Transaction Service
+        participant Fraud as Fraud Service
+        participant Wallet as Wallet Service
+    end
+
+    Note over User, Order: Fase 1: Checkout di Marketplace
+
+    User->>FE: Klik "Bayar" (Checkout)
+    FE->>Order: Mutation CreateOrder(input)
+    activate Order
+    Order->>Order: Validasi Stok & Harga
+    Order->>Order: Buat Order (Status: PENDING)
+    Order-->>FE: Return OrderID & TotalHarga
+    deactivate Order
+
+    Note over User, Wallet: Fase 2: Proses Pembayaran
+
+    FE->>Gateway: Request Payment (OrderID, Nominal, Token)
+    activate Gateway
+    Gateway->>User: Minta PIN Keamanan
+    User->>Gateway: Input PIN
+    
+    Gateway->>Trans: ProcessTransaction(Type: PAYMENT)
+    activate Trans
+    
+    rect rgb(255, 255, 255)
+        Note right of Trans: Cek Keamanan & Saldo
+        Trans->>Fraud: CheckFraud(UserID, Amount)
+        activate Fraud
+        Fraud-->>Trans: Status: SAFE / LOW RISK
+        deactivate Fraud
+
+        Trans->>Wallet: DebitBalance(UserID, Amount)
+        activate Wallet
+        Wallet->>Wallet: Cek Saldo Cukup?
+        Wallet->>Wallet: Kurangi Saldo
+        Wallet-->>Trans: Saldo Berhasil Terpotong
+        deactivate Wallet
+    end
+
+    Trans->>Trans: Simpan Log Transaksi
+    Trans-->>Gateway: Transaksi Berhasil
+    deactivate Trans
+
+    Note over Gateway, FE: Fase 3: Finalisasi
+
+    par Update Status Paralel
+        Gateway->>Order: Webhook/Callback (Payment Success)
+        activate Order
+        Order->>Order: Update Status Order (PAID)
+        deactivate Order
+    and
+        Gateway-->>FE: Response Sukses
+        FE-->>User: Tampilkan "Pembayaran Berhasil"
+    end
+    deactivate Gateway
+```
+---
 ## Tes Integrasi 
 - BlackDoctrine (Marketplace): http://localhost:7001/graphql & http://localhost:7003/graphql
 - Dompet Digital Sawit: http://localhost:8000/graphql
