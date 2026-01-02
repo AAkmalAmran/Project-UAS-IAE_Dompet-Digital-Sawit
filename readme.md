@@ -327,6 +327,103 @@ query {
 ```
 
 ---
+## Tes Integrasi 
+### 1. Registrasi Marketplace (7001)
+```graphql
+mutation RegisterUser($nama: String!, $email: String!, $password: String!) {
+  register(nama: $nama, email: $email, password: $password) {
+    id
+    nama
+    email
+    role
+    isActive
+    statusLabel
+  }
+}
+```
+Variabel:
+```graphql
+{
+  "nama": "Sakura Haruno",
+  "email": "sakura@gmail.com",
+  "password": "password123"
+}
+```
+
+### 2. Login Marketplace (7001)
+```graphql
+mutation LoginUser($email: String!, $password: String!) {
+  login(email: $email, password: $password) {
+    token
+    user {
+      id
+      nama
+      email
+      role
+      isActive
+      statusLabel
+    }
+  }
+}
+```
+Variabel:
+```graphql
+{
+  "email": "sakura@gmail.com",
+  "password": "password123"
+}
+```
+*Copy `token` untuk dimasukkan di header (Authorization)*
+
+### 3. Buat Order (7003)
+```graphql
+mutation BuatOrderBaru {
+  createOrder(input: {
+    productId: "1",       
+    quantity: 2,
+    alamatPengiriman: "Jalan Konoha No. 02",
+    metodePengiriman: "REGULER"
+  }) {
+    id
+    totalHarga
+    nomorVA  # <--- COPY NOMOR INI untuk langkah selanjutnya         
+    status
+    paymentStatus
+    ongkir
+  }
+}
+```
+
+### 4. Melakukan Pembayaran di Dompet Digitak Sawit (8000)
+```graphql
+mutation {
+  createTransaction(input: {
+    walletId: "PASTE_WALLET_ID_DISINI",
+    amount: 20000,
+    type: PAYMENT,
+    vaNumber: "VA_MARKETPLACE"
+  }) {
+    transactionId
+    status
+    vaNumber
+  }
+}
+```
+
+### 5. Cek Tagihan (7003)
+```graphql
+query CekTagihanByVA {
+  getOrderByVA(vaNumber: "VA_MARKETPLACE") {
+    id
+    totalHarga
+    status
+    paymentStatus
+    productId
+    quantity
+  }
+}
+```
+---
 
 ## Teknologi yang Digunakan
 
