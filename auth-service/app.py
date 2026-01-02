@@ -131,7 +131,7 @@ def resolve_profile(_, info, token):
         raise Exception("Invalid Token")
 
 schema = make_executable_schema(type_defs, query, mutation)
-app = FastAPI(title="User Service GraphQL")
+app = FastAPI(title="Auth Service GraphQL")
 
 @app.on_event("startup")
 def startup():

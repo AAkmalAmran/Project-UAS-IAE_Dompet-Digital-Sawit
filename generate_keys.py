@@ -3,10 +3,10 @@ import shutil
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-# Tentukan lokasi folder target (kunci harus ada di user-service)
-target_folder = "user-service"
+# Tentukan lokasi folder target (kunci harus ada di auth-service)
+target_folder = "auth-service"
 
-# Pastikan folder user-service ada
+# Pastikan folder auth-service ada
 if not os.path.exists(target_folder):
     os.makedirs(target_folder)
 
