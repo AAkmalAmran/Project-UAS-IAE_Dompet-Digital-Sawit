@@ -14,7 +14,7 @@ Sistem ini bertindak sebagai *Service Provider* yang menangani pemrosesan transa
 
 1. **Arsitektur Microservices Terdistribusi:**
 Sistem terdiri dari lima layanan utama yang memiliki tanggung jawab spesifik:
-    * **User Service (Auth):** Mengelola identitas pengguna dan keamanan berbasis *Independent JWT Authentication* menggunakan algoritma asimetris RS256.
+    * **Auth Service:** Mengelola identitas pengguna dan keamanan berbasis *Independent JWT Authentication* menggunakan algoritma asimetris RS256.
 
 
     * **Transaction Service:** Bertindak sebagai *Payment Gateway* dan orkestrator yang mengatur alur pembayaran dari inisiasi hingga penyelesaian.
@@ -48,8 +48,8 @@ Sistem menyediakan endpoint publik untuk memproses pembayaran dari aplikasi Mark
 flowchart TB
     Client["Client (Frontend/Playground)"] -- GraphQL Request --> Gateway["API Gateway (Port 8000)"]
     
-    subgraph Services ["Native GraphQL Microservices"]
-        User["User Service :8001"]
+    subgraph Services ["Microservices"]
+        Auth["Auth Service :8001"]
         Wallet["Wallet Service :8002"]
         Trx["Transactions Service :8003"]
         Fraud["Fraud Service :8004"]
@@ -69,7 +69,7 @@ flowchart TB
     end
 
     %% Flow Communication (Gateway Proxy)
-    Gateway -- Proxies Query --> User & Wallet & Trx & Fraud & History
+    Gateway -- Proxies Query --> Auth & Wallet & Trx & Fraud & History
     
     %% Inter-service Communication (GraphQL Calls)
     Trx -- Mutation: checkFraud --> Fraud
@@ -78,7 +78,7 @@ flowchart TB
     Trx -- Query/Mutation (Integration) --> Marketplace
 
     %% DB Connections
-    User --> DB1
+    Auth --> DB1
     Wallet --> DB2
     Trx --> DB3
     Fraud --> DB4
@@ -94,7 +94,7 @@ Ikuti langkah-langkah berikut untuk menjalankan sistem secara lokal menggunakan 
 
 Salin file `.env.example` menjadi `.env` di setiap folder service:
 
-* `user-service/.env`
+* `Auth-service/.env`
 * `wallet-service/.env`
 * `transactions-service/.env`
 * `fraud-service/.env`
@@ -103,6 +103,11 @@ Salin file `.env.example` menjadi `.env` di setiap folder service:
 ### 2. Generate RSA Keys (Otomatis)
 
 Sistem menggunakan enkripsi RSA (RS256) untuk keamanan token JWT. Kami telah menyediakan skrip python untuk membuatnya secara otomatis.
+
+```bash
+pip install cryptography
+
+```
 
 Buka terminal di *root folder* proyek dan jalankan:
 
@@ -143,7 +148,7 @@ Semua layanan mengekspos endpoint GraphQL di path `/graphql`.
 | Service | Port (Host) | Tipe API | Database |
 | --- | --- | --- | --- |
 | **API Gateway** | **8000** | **GraphQL Proxy** | - |
-| User Service | 8001 | Native GraphQL | `users.db` |
+| Auth Service | 8001 | Native GraphQL | `users.db` |
 | Wallet Service | 8002 | Native GraphQL | `wallets.db` |
 | Transactions Service | 8003 | Native GraphQL | `transactions.db` |
 | Fraud Service | 8004 | Native GraphQL | `fraud.db` |
@@ -157,7 +162,7 @@ Berikut adalah daftar lengkap Query dan Mutation yang tersedia di sistem. Semua 
 
 | Service | Tipe | Nama Operation | Deskripsi & Parameter Input |
 | :--- | :--- | :--- | :--- |
-| **User Service** | Mutation | `registerUser` | Mendaftarkan pengguna baru.<br>*(Input: username, fullname, email, password)* |
+| **Auth Service** | Mutation | `registerUser` | Mendaftarkan pengguna baru.<br>*(Input: username, fullname, email, password)* |
 | | Mutation | `loginUser` | Login untuk mendapatkan token akses (JWT).<br>*(Input: email, password)* |
 | | Query | `myProfile` | Mengambil profil pengguna saat ini.<br>*(Input: token)* |
 | **Wallet Service** | Mutation | `createWallet` | Membuat dompet digital baru.<br>*(Input: walletName)* |
@@ -179,7 +184,7 @@ Berikut adalah daftar lengkap Query dan Mutation yang tersedia di sistem. Semua 
 
 Semua request dikirim ke `http://localhost:8000/graphql`.
 
-### 1. Autentikasi (User)
+### 1. Autentikasi (Auth)
 
 **Register:**
 
