@@ -387,7 +387,7 @@ mutation BuatOrderBaru {
     metodePengiriman: "REGULER"
   }) {
     id
-    totalHarga
+    totalHarga # <--- COPY Harga INI untuk langkah selanjutnya 
     nomorVA  # <--- COPY NOMOR INI untuk langkah selanjutnya         
     status
     paymentStatus
@@ -401,9 +401,9 @@ mutation BuatOrderBaru {
 mutation {
   createTransaction(input: {
     walletId: "PASTE_WALLET_ID_DISINI",
-    amount: 20000,
+    amount: totalHarga, # <--- Paste totalHarga disini
     type: PAYMENT,
-    vaNumber: "VA_MARKETPLACE"
+    vaNumber: "VA_MARKETPLACE" # <--- Paste nomorVA disini
   }) {
     transactionId
     status
