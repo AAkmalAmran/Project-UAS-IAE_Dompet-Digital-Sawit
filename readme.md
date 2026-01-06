@@ -172,7 +172,7 @@ Berikut adalah daftar lengkap Query dan Mutation yang tersedia di sistem. Semua 
 | | Mutation | `deductWallet` | Mengurangi saldo (Pembayaran/Transfer).<br>*(Input: walletId, amount)* |
 | | Query | `myWallets` | Melihat daftar dompet dan saldo milik pengguna. |
 | **Transaction Service** | Mutation | `createTransaction` | Memproses transaksi baru.<br>*(Input: walletId, amount, type [DEPOSIT/PAYMENT/TRANSFER], vaNumber [opsional])* |
-| | Mutation | `deleteAllTransactions` | Menghapus riwayat transaksi pengguna di transactions.db. |
+| | Mutation | `deleteAllTransactions` | Menghapus riwayat transaksi pengguna di `transactions.db`. |
 | | Query | `myTransactions` | Melihat riwayat transaksi pengguna. |
 | **Fraud Service** | Mutation | `checkFraud` | Mengecek risiko transaksi (Internal).<br>*(Input: userId, amount)* |
 | | Mutation | `deleteFraudLog` | Menghapus log deteksi fraud (Admin Only).<br>*(Input: logId)* |
@@ -276,6 +276,7 @@ mutation topUp{
 ```
 
 **Pembayaran Integrasi (Payment):**
+
 Sistem akan menghubungi Marketplace eksternal untuk validasi VA Number.
 
 ```graphql
@@ -293,7 +294,7 @@ mutation payment{
 }
 ```
 
-**Melihat Transaksi**
+**Melihat Transaksi:**
 
 ```graphql
 query LihatTransaksi {
@@ -310,7 +311,7 @@ query LihatTransaksi {
 }
 ```
 
-**Hapus Transaksi**
+**Hapus Transaksi:**
 
 ```graphql
 mutation hapusTransaksi{
