@@ -96,6 +96,7 @@ type Mutation {
     
     # --- Transaction ---
     createTransaction(input: TransactionInput!): Transaction
+    deleteAllTransactions: Boolean
     
     # --- Fraud (Admin Only) ---
     deleteFraudLog(logId: String!): String

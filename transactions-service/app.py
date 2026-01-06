@@ -12,7 +12,7 @@ from ariadne import QueryType, MutationType, make_executable_schema, EnumType
 from ariadne.asgi import GraphQL
 
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./transactions.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/transactions.db")
 
 # --- SERVICE URLs (Target GraphQL Endpoints) ---
 WALLET_URL = os.getenv("WALLET_URL", "http://wallet-service:8002/graphql")
@@ -110,6 +110,7 @@ type_defs = """
     }
     type Mutation {
         createTransaction(input: TransactionInput!): Transaction
+        deleteAllTransactions: Boolean
     }
 """
 
@@ -180,6 +181,18 @@ async def resolve_create(_, info, input):
     except: pass
 
     return {"transactionId": trx.transaction_id, "userId": trx.user_id, "walletId": trx.wallet_id, "amount": trx.amount, "type": trx.type, "status": trx.status, "vaNumber": trx.va_number, "createdAt": str(trx.created_at)}
+
+@mutation.field("deleteAllTransactions")
+def resolve_delete_all(_, info):
+    request = info.context["request"]
+    user = get_current_user(request)
+    db = SessionLocal()
+    try:
+        db.query(Transaction).filter(Transaction.user_id == str(user["user_id"])).delete()
+        db.commit()
+        return True
+    finally:
+        db.close()
 
 schema = make_executable_schema(type_defs, query, mutation, EnumType("TransactionType", {"DEPOSIT": "DEPOSIT", "PAYMENT": "PAYMENT", "TRANSFER": "TRANSFER"}))
 app = FastAPI(title="Transaction Service GraphQL")

@@ -12,6 +12,8 @@ services:
       - "8001:8001"
     volumes:
       - ./auth-service:/app  # Sinkronisasi kode & DB SQLite ke Host
+      - auth-data:/app/data 
+    working_dir: /app
     networks:
       - app-network
 
@@ -26,7 +28,9 @@ services:
       - "8002:8002"
     volumes:
       - ./wallet-service:/app
+      - wallet-data:/app/data 
       - ./auth-service/public.pem:/app/public.pem:ro 
+    working_dir: /app
     depends_on:
       - auth-service
     networks:
@@ -43,7 +47,9 @@ services:
       - "8003:8003"
     volumes:
       - ./transactions-service:/app
+      - transactions-data:/app/data 
       - ./auth-service/public.pem:/app/public.pem:ro
+    working_dir: /app
     depends_on:
       - auth-service
       - wallet-service
@@ -63,7 +69,9 @@ services:
       - "8004:8004"
     volumes:
       - ./fraud-service:/app
+      - fraud-data:/app/data 
       - ./auth-service/public.pem:/app/public.pem:ro
+    working_dir: /app
     depends_on:
       - auth-service
     networks:
@@ -80,7 +88,9 @@ services:
       - "8005:8005"
     volumes:
       - ./history-service:/app
+      - history-data:/app/data 
       - ./auth-service/public.pem:/app/public.pem:ro
+    working_dir: /app
     depends_on:
       - auth-service
     networks:
@@ -105,6 +115,13 @@ services:
       - history-service
     networks:
       - app-network
+
+volumes:
+  auth-data:
+  wallet-data:
+  transactions-data:
+  fraud-data:
+  history-data:
 
 networks:
   app-network:

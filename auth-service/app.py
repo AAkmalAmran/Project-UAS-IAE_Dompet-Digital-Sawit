@@ -16,7 +16,7 @@ from ariadne.asgi import GraphQL
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
-DATABASE_URL = "sqlite:///./users.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/users.db")
 ALGORITHM = os.getenv("ALGORITHM", "RS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 SECRET_KEY = os.getenv("SECRET_KEY", "ini-sangat-berbahaya-loh-dattebayo")
