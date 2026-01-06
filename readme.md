@@ -375,7 +375,12 @@ sequenceDiagram
 
     Gateway->>Trans: ProcessPayment(Token, VAnumber, Total)
     activate Trans
-    
+
+        Trans-->>Order: checkOrder(vaNumber & Total)
+        Order->>Order: getOrderbyVa(vaNumber)
+        Order->>Gateway: orderValid
+        Gateway->>Trans: continueTRX
+
         Trans->>Fraud: checkFraud(UserID, Total)
         activate Fraud
         Fraud->>Fraud: Scoring Analysis
