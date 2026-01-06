@@ -11,7 +11,7 @@ from ariadne import QueryType, MutationType, make_executable_schema
 from ariadne.asgi import GraphQL
 
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./history.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/history.db")
 PUBLIC_KEY_PATH = "/app/public.pem"
 try:
     with open(PUBLIC_KEY_PATH, "r") as f: PUBLIC_KEY = f.read()

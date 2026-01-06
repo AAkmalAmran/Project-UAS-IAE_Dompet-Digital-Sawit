@@ -65,6 +65,11 @@ async def r_create_trx(_, info, input):
     q = "mutation($i: TransactionInput!) { createTransaction(input: $i) { transactionId userId walletId amount type status vaNumber createdAt } }"
     return (await proxy_gql(TRX_URL, q, {"i": input}, info.context["request"]))["createTransaction"]
 
+@mutation.field("deleteAllTransactions")
+async def r_delete_all_trx(_, info):
+    q = "mutation { deleteAllTransactions }"
+    return (await proxy_gql(TRX_URL, q, {}, info.context["request"]))["deleteAllTransactions"]
+
 # FRAUD & HISTORY
 @query.field("getFraudLogs")
 async def r_fraud(_, info):

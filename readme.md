@@ -172,6 +172,7 @@ Berikut adalah daftar lengkap Query dan Mutation yang tersedia di sistem. Semua 
 | | Mutation | `deductWallet` | Mengurangi saldo (Pembayaran/Transfer).<br>*(Input: walletId, amount)* |
 | | Query | `myWallets` | Melihat daftar dompet dan saldo milik pengguna. |
 | **Transaction Service** | Mutation | `createTransaction` | Memproses transaksi baru.<br>*(Input: walletId, amount, type [DEPOSIT/PAYMENT/TRANSFER], vaNumber [opsional])* |
+| | Mutation | `deleteAllTransactions` | Menghapus riwayat transaksi pengguna di transactions.db. |
 | | Query | `myTransactions` | Melihat riwayat transaksi pengguna. |
 | **Fraud Service** | Mutation | `checkFraud` | Mengecek risiko transaksi (Internal).<br>*(Input: userId, amount)* |
 | | Mutation | `deleteFraudLog` | Menghapus log deteksi fraud (Admin Only).<br>*(Input: logId)* |
@@ -290,7 +291,31 @@ mutation payment{
     vaNumber
   }
 }
+```
 
+**Melihat Transaksi**
+
+```graphql
+query LihatTransaksi {
+  myTransactions {
+    transactionId
+    userId
+    walletId
+    amount
+    type
+    status
+    vaNumber
+    createdAt
+  }
+}
+```
+
+**Hapus Transaksi**
+
+```graphql
+mutation hapusTransaksi{
+  deleteAllTransactions
+}
 ```
 
 ### 4. Riwayat (History)
