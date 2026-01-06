@@ -70,12 +70,17 @@ async def r_delete_all_trx(_, info):
     q = "mutation { deleteAllTransactions }"
     return (await proxy_gql(TRX_URL, q, {}, info.context["request"]))["deleteAllTransactions"]
 
-# FRAUD & HISTORY
+# FRAUD
 @query.field("getFraudLogs")
 async def r_fraud(_, info):
     q = "{ getFraudLogs { logId userId amount status reason } }"
     return (await proxy_gql(FRAUD_URL, q, {}, info.context["request"]))["getFraudLogs"]
 
+@mutation.field("deleteFraudLog")
+async def r_del_fraud(_, info, logId):
+    return (await proxy_gql(FRAUD_URL, "mutation($l: String!) { deleteFraudLog(logId: $l) }", {"l": logId}, info.context["request"]))["deleteFraudLog"]
+
+# HISTORY
 @query.field("myHistory")
 async def r_hist(_, info):
     q = "{ myHistory { historyId transactionId userId amount type status createdAt } }"
@@ -84,11 +89,6 @@ async def r_hist(_, info):
 @mutation.field("deleteHistory")
 async def r_del_hist(_, info, historyId):
     return (await proxy_gql(HISTORY_URL, "mutation($h: String!) { deleteHistory(historyId: $h) }", {"h": historyId}, info.context["request"]))["deleteHistory"]
-
-@mutation.field("deleteFraudLog")
-async def r_del_fraud(_, info, logId):
-    return (await proxy_gql(FRAUD_URL, "mutation($l: String!) { deleteFraudLog(logId: $l) }", {"l": logId}, info.context["request"]))["deleteFraudLog"]
-
 
 type_defs = load_schema_from_path("schema.graphql")
 schema = make_executable_schema(type_defs, query, mutation)

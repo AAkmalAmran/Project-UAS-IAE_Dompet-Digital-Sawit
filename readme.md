@@ -333,6 +333,7 @@ query cekHistori{
     amount
     type
     status
+    vaNumber
     createdAt
   }
 }

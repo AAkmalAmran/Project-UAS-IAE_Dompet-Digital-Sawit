@@ -50,28 +50,38 @@ def get_current_user(request):
         raise Exception("Unauthorized")
 
 # --- HELPER: INTEGRASI MARKETPLACE ---
-async def call_external_api_group(va_number: str, amount: float):
-    print(f"[INTEGRATION] Checking Marketplace VA: {va_number}")
+#Validasi order ke marketplace
+async def validate_marketplace_order(va_number: str, amount: float):
+    print(f"[INTEGRATION] Validating VA: {va_number}")
     async with httpx.AsyncClient() as client:
         try:
-            # 1. Cek Tagihan
             q_check = "query($va: String!) { getOrderByVA(vaNumber: $va) { totalHarga } }"
             res = await client.post(EXTERNAL_ORDER_URL, json={"query": q_check, "variables": {"va": va_number}})
-            if res.status_code != 200: return {"success": False, "message": "Connection Error"}
+            
+            if res.status_code != 200: 
+                raise Exception("Marketplace Connection Error")
             
             data = res.json().get("data", {}).get("getOrderByVA")
-            if not data: return {"success": False, "message": "VA Not Found"}
+            if not data: 
+                raise Exception("VA Not Found")
             
             if float(data["totalHarga"]) != float(amount):
-                return {"success": False, "message": "Nominal Mismatch"}
+                raise Exception("Nominal Mismatch")
+                
+            return True
+        except Exception as e:
+            raise Exception(str(e))
 
-            # 2. Update Status di Marketplace
+# update status payment ke marketplace
+async def complete_marketplace_payment(va_number: str):
+    print(f"[INTEGRATION] Completing Payment for VA: {va_number}")
+    async with httpx.AsyncClient() as client:
+        try:
             q_pay = 'mutation($va: String!, $s: String!) { updatePaymentStatus(vaNumber: $va, status: $s) }'
             await client.post(EXTERNAL_ORDER_URL, json={"query": q_pay, "variables": {"va": va_number, "s": "PROCESSED"}})
-            
-            return {"success": True, "message": "Verified"}
-        except Exception as e:
-            return {"success": False, "message": str(e)}
+        except:
+            # Opsional: Log error jika gagal update status ke marketplace meski saldo sudah terpotong
+            print("Failed to update marketplace status")
 
 # --- HELPER: CALL GRAPHQL SERVICE LAIN ---
 async def gql_request(url, query, variables, headers):
@@ -147,18 +157,32 @@ async def resolve_create(_, info, input):
     trx_type = input["type"]
     va_number = input.get("vaNumber")
 
-    # 1. INTEGRASI MARKETPLACE (Jika Payment)
+    # 0. CEK DUPLIKASI (Idempotency Check) 
+    if trx_type == "PAYMENT" and va_number:
+        db = SessionLocal()
+        try:
+            already_paid = db.query(Transaction).filter(
+                Transaction.va_number == va_number,
+                Transaction.status == "SUCCESS"
+            ).first()
+            
+            if already_paid:
+                raise Exception("Transaksi Ditolak: Tagihan VA ini sudah lunas sebelumnya.")
+        finally:
+            db.close()
+
+    # 1. VALIDASI MARKETPLACE 
     if trx_type == "PAYMENT":
         if not va_number: raise Exception("VA Number Required for Payment")
-        integ = await call_external_api_group(va_number, amount)
-        if not integ["success"]: raise Exception(f"Marketplace Error: {integ['message']}")
+        await validate_marketplace_order(va_number, amount)
 
-    # 2. CEK FRAUD (Call Fraud Service GQL)
+    # 2. CEK FRAUD (Fraud Service)
     f_q = "mutation($u: String!, $a: Float!) { checkFraud(userId: $u, amount: $a) { is_fraud reason } }"
     f_res = await gql_request(FRAUD_URL, f_q, {"u": str(user["user_id"]), "a": amount}, headers)
-    if f_res["checkFraud"]["is_fraud"]: raise Exception(f"Fraud Detected: {f_res['checkFraud']['reason']}")
+    if f_res["checkFraud"]["is_fraud"]: 
+        raise Exception(f"Fraud Detected: {f_res['checkFraud']['reason']}")
 
-    # 3. UPDATE WALLET (Call Wallet Service GQL)
+    # 3. EKSEKUSI SALDO (Wallet Service)
     if trx_type == "DEPOSIT":
         w_q = "mutation($id: String!, $a: Float!) { topupWallet(walletId: $id, amount: $a) { balance } }"
     else: # PAYMENT / TRANSFER
@@ -166,21 +190,48 @@ async def resolve_create(_, info, input):
     
     await gql_request(WALLET_URL, w_q, {"id": wallet_id, "a": amount}, headers)
 
-    # 4. SAVE DB
+    # 4. SIMPAN TRANSAKSI KE DB (Lokal)
     db = SessionLocal()
-    trx = Transaction(user_id=str(user["user_id"]), wallet_id=wallet_id, amount=amount, type=trx_type, va_number=va_number, status="SUCCESS")
+    trx = Transaction(
+        user_id=str(user["user_id"]), 
+        wallet_id=wallet_id, 
+        amount=amount, 
+        type=trx_type, 
+        va_number=va_number, 
+        status="SUCCESS"
+    )
     db.add(trx)
     db.commit()
     db.refresh(trx)
     db.close()
 
-    # 5. LOG HISTORY (Call History Service GQL)
+    # 5. UPDATE STATUS MARKETPLACE (Hanya jika sukses)
+    if trx_type == "PAYMENT":
+        await complete_marketplace_payment(va_number)
+
+    # 6. CATAT HISTORY
     h_q = "mutation($i: HistoryInput!) { addHistory(input: $i) }"
-    h_in = {"transactionId": trx.transaction_id, "userId": trx.user_id, "amount": amount, "type": trx_type, "status": "SUCCESS"}
+    h_in = {
+        "transactionId": trx.transaction_id, 
+        "userId": trx.user_id, 
+        "amount": amount, 
+        "type": trx_type, 
+        "vaNumber": va_number,
+        "status": "SUCCESS"
+    }
     try: await gql_request(HISTORY_URL, h_q, {"i": h_in}, headers)
     except: pass
 
-    return {"transactionId": trx.transaction_id, "userId": trx.user_id, "walletId": trx.wallet_id, "amount": trx.amount, "type": trx.type, "status": trx.status, "vaNumber": trx.va_number, "createdAt": str(trx.created_at)}
+    return {
+        "transactionId": trx.transaction_id, 
+        "userId": trx.user_id, 
+        "walletId": trx.wallet_id, 
+        "amount": trx.amount, 
+        "type": trx.type, 
+        "status": trx.status, 
+        "vaNumber": trx.va_number, 
+        "createdAt": str(trx.created_at)
+    }
 
 @mutation.field("deleteAllTransactions")
 def resolve_delete_all(_, info):

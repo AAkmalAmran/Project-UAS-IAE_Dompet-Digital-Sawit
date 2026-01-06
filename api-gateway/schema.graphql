@@ -64,6 +64,7 @@ type History {
     amount: Float
     type: String
     status: String
+    vaNumber: String
     createdAt: String
 }
 

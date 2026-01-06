@@ -28,6 +28,7 @@ class History(Base):
     user_id = Column(String)
     amount = Column(Float)
     type = Column(String)
+    va_number = Column(String, nullable=True)
     status = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -46,6 +47,7 @@ type_defs = """
         userId: String
         amount: Float
         type: String
+        vaNumber: String
         status: String
         createdAt: String
     }
@@ -55,6 +57,7 @@ type_defs = """
         amount: Float!
         type: String!
         status: String!
+        vaNumber: String
     }
     type Query {
         myHistory: [History]
@@ -83,7 +86,7 @@ def resolve_history(_, info):
 def resolve_add(_, info, input):
     db = SessionLocal()
     try:
-        h = History(transaction_id=input["transactionId"], user_id=input["userId"], amount=input["amount"], type=input["type"], status=input["status"])
+        h = History(transaction_id=input["transactionId"], user_id=input["userId"], amount=input["amount"], type=input["type"], status=input["status"], va_number=input.get("vaNumber"), created_at=datetime.utcnow())
         db.add(h)
         db.commit()
         return True
