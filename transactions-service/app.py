@@ -216,7 +216,7 @@ async def resolve_create(_, info, input):
         "userId": trx.user_id, 
         "amount": amount, 
         "type": trx_type, 
-        "vaNumber": va_number,
+        "vaNumber": trx.va_number,
         "status": "SUCCESS"
     }
     try: await gql_request(HISTORY_URL, h_q, {"i": h_in}, headers)
