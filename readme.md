@@ -40,6 +40,11 @@ Menggunakan Gateway sebagai pintu masuk tunggal (*Entry Point*) yang meneruskan 
 4. **Integrasi Eksternal (Marketplace):**
 Sistem menyediakan endpoint publik untuk memproses pembayaran dari aplikasi Marketplace luar (seperti *BlackDoctrine*), memvalidasi tagihan via Virtual Account, dan memberikan respon status pelunasan secara otomatis.
 
+### Integrasi Antar Sistem
+Berikut adalah sistem yang perlu ada sebelum melakukan uji integrasi
+1. BlackDoctrine (Marketplace): https://github.com/felix787878/BlackDoctrine.git
+2. GoShip (Ekspedisi): https://github.com/TopasAkbar/GoShip.git
+
 ---
 
 ## Arsitektur Sistem
@@ -186,7 +191,7 @@ Semua request dikirim ke `http://localhost:8000/graphql`.
 **Register:**
 
 ```graphql
-mutation {
+mutation registrasi{
   registerUser(
     username: "narto", 
     fullname: "Naruto Uzumaki", 
@@ -200,7 +205,7 @@ mutation {
 **Login:**
 
 ```graphql
-mutation {
+mutation loginNasabah{
   loginUser(email: "naruto@gmail.com", password: "password123") {
     access_token
     user {
@@ -221,7 +226,7 @@ mutation {
 **Buat Wallet Baru:**
 
 ```graphql
-mutation {
+mutation buatWallet{
   createWallet(walletName: "Tabungan Utama") {
     walletId
     walletName
@@ -237,7 +242,7 @@ mutation {
 **Cek Saldo:**
 
 ```graphql
-query {
+query cekWallet{
   myWallets {
     walletName
     balance
@@ -254,7 +259,7 @@ query {
 **Top Up (Deposit):**
 
 ```graphql
-mutation {
+mutation topUp{
   createTransaction(input: {
     walletId: "PASTE_WALLET_ID_DISINI",
     amount: 500000,
@@ -273,7 +278,7 @@ mutation {
 Sistem akan menghubungi Marketplace eksternal untuk validasi VA Number.
 
 ```graphql
-mutation {
+mutation payment{
   createTransaction(input: {
     walletId: "PASTE_WALLET_ID_DISINI",
     amount: 20000,
@@ -313,8 +318,11 @@ query cekHistori{
 
 **Cek Log Fraud:**
 
+* Admin Email= admin@gmail.com
+* Admin Password= admin12345
+
 ```graphql
-query {
+query cekFraud{
   getFraudLogs {
     logId
     userId
@@ -407,91 +415,46 @@ sequenceDiagram
 ```
 ---
 ## Tes Integrasi 
-- BlackDoctrine (Marketplace): http://localhost:7001/graphql & http://localhost:7003/graphql
+- BlackDoctrine (Marketplace): http://localhost:7003/graphql
 - Dompet Digital Sawit: http://localhost:8000/graphql
-### 1. Registrasi Marketplace (7001)
+- goShip (Ekspedisi) 
+### 1. Buat Order (7003)
 ```graphql
-mutation RegisterUser($nama: String!, $email: String!, $password: String!) {
-  register(nama: $nama, email: $email, password: $password) {
-    id
-    nama
-    email
-    role
-    isActive
-    statusLabel
-  }
-}
-```
-Variabel:
-```graphql
-{
-  "nama": "Sakura Haruno",
-  "email": "sakura@gmail.com",
-  "password": "password123"
-}
-```
-
-### 2. Login Marketplace (7001)
-```graphql
-mutation LoginUser($email: String!, $password: String!) {
-  login(email: $email, password: $password) {
-    token
-    user {
-      id
-      nama
-      email
-      role
-      isActive
-      statusLabel
-    }
-  }
-}
-```
-Variabel:
-```graphql
-{
-  "email": "sakura@gmail.com",
-  "password": "password123"
-}
-```
-*Copy `token` untuk dimasukkan di header (Authorization)*
-
-### 3. Buat Order (7003)
-```graphql
-mutation BuatOrderBaru {
+mutation Checkout {
   createOrder(input: {
-    productId: "1",       
-    quantity: 2,
-    alamatPengiriman: "Jalan Konoha No. 02",
+    productId: "1",       # Pastikan ID produk ada di DB Product Service
+    quantity: 1,
+    alamatPengiriman: "Jl. Merdeka No 1",
+    kotaTujuanId: "1",    # ID Kota Tujuan (Untuk GoShip)
     metodePengiriman: "REGULER"
   }) {
     id
-    totalHarga # <--- COPY Harga INI untuk langkah selanjutnya 
-    nomorVA  # <--- COPY NOMOR INI untuk langkah selanjutnya         
-    status
-    paymentStatus
-    ongkir
+    status           # Harapannya: PENDING
+    paymentStatus    # Harapannya: UNPAID
+    totalHarga       # CATAT ANGKA INI (Misal: 150000)
+    nomorVA          # CATAT KODE INI (Misal: BM-170...)
+    nomorResi        # Harapannya: null
   }
 }
 ```
 
-### 4. Melakukan Pembayaran di Dompet Digitak Sawit (8000)
+### 2. Melakukan Pembayaran di Dompet Digitak Sawit (8000)
 ```graphql
 mutation {
   createTransaction(input: {
-    walletId: "PASTE_WALLET_ID_DISINI",
-    amount: totalHarga, # <--- Paste totalHarga disini
+    walletId: "PASTE_WALLET_ID_DISINI", # <--- Paste wallet_id disini
+    amount: 100000, # <--- Paste totalHarga disini
     type: PAYMENT,
     vaNumber: "VA_MARKETPLACE" # <--- Paste nomorVA disini
   }) {
     transactionId
-    status
+    status         # Harapannya: SUCCESS
     vaNumber
   }
 }
 ```
 
-### 5. Cek Tagihan (7003)
+### 3. Cek Tagihan (7003)
 ```graphql
 query CekTagihanByVA {
   getOrderByVA(vaNumber: "VA_MARKETPLACE") {
@@ -501,6 +464,7 @@ query CekTagihanByVA {
     paymentStatus
     productId
     quantity
+    nomorResi
   }
 }
 ```
