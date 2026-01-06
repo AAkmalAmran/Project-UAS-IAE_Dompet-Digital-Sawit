@@ -339,10 +339,9 @@ query cekFraud{
 ```mermaid
 sequenceDiagram
     autonumber
-    
+
+    actor User as Pengguna
     box "BlackDoctrine (Marketplace)" #FFFFFF
-        actor User as Pengguna
-        participant FE as Frontend
         participant Order as Order Service
     end
 
@@ -357,16 +356,14 @@ sequenceDiagram
 
     Note over User, Order: 1. Checkout di BlackDoctrine (Akun A)
 
-    User->>FE: Klik "Bayar"
-    FE->>Order: CreateOrder(Items, Total)
+    User->>Order: CreateOrder(Items, Total)
     activate Order
     Order->>Order: Generate VAnumber & Total
-    Order-->>FE: Return (VAnumber, Total, PaymentData)
     deactivate Order
 
     Note over User, Auth: 2. Redirection ke Dompet Sawit (Akun B)
 
-    User->>Gateway: Redirect & Input Credential (Email, Pass)
+    User->>Gateway: Login (Email, Pass)
     activate Gateway
     Gateway->>Auth: VerifyCredential(Email, Pass)
     activate Auth
@@ -406,8 +403,6 @@ sequenceDiagram
 
     activate Order
     Order->>Order: Update Order Status: PAID
-    Order-->>Gateway: Acknowledge (200 OK)
-    Order-->>FE: Transaksi Sukses
     deactivate Order
 
     
