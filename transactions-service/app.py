@@ -51,7 +51,7 @@ def get_current_user(request):
         raise Exception("Unauthorized")
 
 # --- HELPER: INTEGRASI MARKETPLACE ---
-#Validasi order ke marketplace
+# Validasi order ke marketplace
 async def validate_marketplace_order(va_number: str, amount: float):
     print(f"[INTEGRATION] Validating VA: {va_number}")
     async with httpx.AsyncClient() as client:
@@ -169,6 +169,11 @@ async def resolve_create(_, info, input):
     wallet_id = input["walletId"]
     trx_type = input["type"]
     va_number = input.get("vaNumber")
+
+    # Validasi Format VA: Harus diawali "DS-8800"
+    if trx_type == "PAYMENT":
+        if not va_number or not va_number.startswith("DS-8800"):
+            raise Exception("Transaksi Ditolak: Nomor VA tidak valid (Harus diawali 'DS-8800')")
 
     # 0. CEK DUPLIKASI (Idempotency Check) 
     if trx_type == "PAYMENT" and va_number:
