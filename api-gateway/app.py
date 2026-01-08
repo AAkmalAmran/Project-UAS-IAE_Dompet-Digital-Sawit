@@ -65,6 +65,14 @@ async def r_create_trx(_, info, input):
     q = "mutation($i: TransactionInput!) { createTransaction(input: $i) { transactionId userId walletId amount type status vaNumber createdAt } }"
     return (await proxy_gql(TRX_URL, q, {"i": input}, info.context["request"]))["createTransaction"]
 
+@mutation.field("generateInvoiceVA")
+async def r_gen_va(_, info, amount, description):
+    q = "mutation($a: Float!, $d: String) { generateInvoiceVA(amount: $a, description: $d) }"
+    
+    result = await proxy_gql(TRX_URL, q, {"a": amount, "d": description}, info.context["request"])
+    
+    return result["generateInvoiceVA"]
+
 @mutation.field("deleteAllTransactions")
 async def r_delete_all_trx(_, info):
     q = "mutation { deleteAllTransactions }"

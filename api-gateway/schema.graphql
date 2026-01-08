@@ -104,6 +104,7 @@ type Mutation {
     # --- Transaction ---
     createTransaction(input: TransactionInput!): Transaction
     deleteAllTransactions: Boolean
+    generateInvoiceVA(amount: Float!, description: String): String
     
     # --- Fraud (Admin Only) ---
     deleteFraudLog(logId: String!): String
