@@ -22,6 +22,11 @@ type Wallet {
     status: String
 }
 
+type DeleteResponse {
+    success: Boolean
+    message: String
+}
+
 # ================= TRANSACTION SERVICE =================
 enum TransactionType {
     DEPOSIT
@@ -94,6 +99,7 @@ type Mutation {
     
     # --- Wallet ---
     createWallet(walletName: String!): Wallet
+    deleteWallet(walletId: String!): DeleteResponse
     
     # --- Transaction ---
     createTransaction(input: TransactionInput!): Transaction

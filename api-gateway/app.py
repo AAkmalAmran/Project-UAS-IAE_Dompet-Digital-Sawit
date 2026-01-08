@@ -54,6 +54,11 @@ async def r_create_wallet(_, info, walletName):
     q = "mutation($n: String!) { createWallet(walletName: $n) { walletId userId walletName balance status } }"
     return (await proxy_gql(WALLET_URL, q, {"n": walletName}, info.context["request"]))["createWallet"]
 
+@mutation.field("deleteWallet")
+async def r_delete_wallet(_, info, walletId):
+    q = "mutation($id: String!) { deleteWallet(walletId: $id) { success message } }"
+    return (await proxy_gql(WALLET_URL, q, {"id": walletId}, info.context["request"]))["deleteWallet"]
+
 # TRANSACTION
 @query.field("myTransactions")
 async def r_trx(_, info):
