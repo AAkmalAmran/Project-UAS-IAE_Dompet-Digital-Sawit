@@ -2,6 +2,7 @@ import httpx
 from fastapi import FastAPI, Request
 from ariadne import QueryType, MutationType, make_executable_schema, load_schema_from_path
 from ariadne.asgi import GraphQL
+from fastapi.responses import HTMLResponse
 import os
 
 # URL Service (GraphQL Endpoints)
@@ -98,6 +99,11 @@ async def r_del_hist(_, info, historyId):
 type_defs = load_schema_from_path("schema.graphql")
 schema = make_executable_schema(type_defs, query, mutation)
 app = FastAPI(title="Gateway")
+
+@app.get("/", response_class=HTMLResponse) 
+async def serve_frontend(): 
+    with open("index.html", "r") as f: return f.read()
+    
 app.add_route("/graphql", GraphQL(schema, debug=True))
 
 if __name__ == "__main__":
