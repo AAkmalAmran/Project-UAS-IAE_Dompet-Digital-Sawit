@@ -425,7 +425,7 @@ sequenceDiagram
     Note right of Order: Request VA Resmi
     Order->>Gateway: generateInvoiceVA(Total)
     Gateway->>Trans: generateInvoiceVA()
-    Trans-->>Gateway: Return "8800xxxx"
+    Trans-->>Gateway: Return "DS-8800xxxx"
     Gateway-->>Order: Return VA Number
     
     Order->>Order: Save Order (Pending)
