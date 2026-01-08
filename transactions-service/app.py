@@ -2,6 +2,7 @@ import os
 import uuid
 import uvicorn
 import httpx
+import random
 from datetime import datetime
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -121,6 +122,7 @@ type_defs = """
     type Mutation {
         createTransaction(input: TransactionInput!): Transaction
         deleteAllTransactions: Boolean
+        generateInvoiceVA(amount: Float!, description: String): String
     }
 """
 
@@ -145,6 +147,17 @@ def resolve_list(_, info):
             "createdAt": str(t.created_at)} for t in trx]
     finally:
         db.close()
+
+@mutation.field("generateInvoiceVA")
+def resolve_generate_va(_, info, amount, description):
+    # 1. Generate Nomor Unik (Prefix DS-8800 + Angka Acak)
+    prefix = "DS-8800"
+    random_digits = random.randint(10000000, 99999999)
+    va_number = f"{prefix}{random_digits}"
+    
+    print(f"Issued VA {va_number} for amount {amount} ({description})")
+    
+    return va_number
 
 @mutation.field("createTransaction")
 async def resolve_create(_, info, input):
