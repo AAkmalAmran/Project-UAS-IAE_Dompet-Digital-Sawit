@@ -1,10 +1,10 @@
 import httpx
 from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
 from ariadne import QueryType, MutationType, make_executable_schema, load_schema_from_path
 from ariadne.asgi import GraphQL
 import os
 
-# URL Service (GraphQL Endpoints)
 USER_URL = "http://auth-service:8001/graphql"
 WALLET_URL = "http://wallet-service:8002/graphql"
 TRX_URL = "http://transactions-service:8003/graphql"
@@ -25,9 +25,6 @@ async def proxy_gql(url, query, vars, req):
 query = QueryType()
 mutation = MutationType()
 
-# --- PROXY RESOLVERS ---
-
-# AUTH
 @query.field("myProfile")
 async def r_prof(_, info, token):
     q = "query($t: String!) { myProfile(token: $t) { user_id username fullname email role } }"
@@ -43,7 +40,6 @@ async def r_reg(_, info, username, fullname, email, password):
     q = "mutation($u: String!, $f: String!, $e: String!, $p: String!) { registerUser(username: $u, fullname: $f, email: $e, password: $p) }"
     return (await proxy_gql(USER_URL, q, {"u": username, "f": fullname, "e": email, "p": password}, info.context["request"]))["registerUser"]
 
-# WALLET
 @query.field("myWallets")
 async def r_wallets(_, info):
     q = "{ myWallets { walletId userId walletName balance status } }"
@@ -59,7 +55,6 @@ async def r_delete_wallet(_, info, walletId):
     q = "mutation($id: String!) { deleteWallet(walletId: $id) { success message } }"
     return (await proxy_gql(WALLET_URL, q, {"id": walletId}, info.context["request"]))["deleteWallet"]
 
-# TRANSACTION
 @query.field("myTransactions")
 async def r_trx(_, info):
     q = "{ myTransactions { transactionId userId walletId amount type status vaNumber createdAt } }"
@@ -75,7 +70,6 @@ async def r_delete_all_trx(_, info):
     q = "mutation { deleteAllTransactions }"
     return (await proxy_gql(TRX_URL, q, {}, info.context["request"]))["deleteAllTransactions"]
 
-# FRAUD
 @query.field("getFraudLogs")
 async def r_fraud(_, info):
     q = "{ getFraudLogs { logId userId amount status reason } }"
@@ -85,10 +79,9 @@ async def r_fraud(_, info):
 async def r_del_fraud(_, info, logId):
     return (await proxy_gql(FRAUD_URL, "mutation($l: String!) { deleteFraudLog(logId: $l) }", {"l": logId}, info.context["request"]))["deleteFraudLog"]
 
-# HISTORY
 @query.field("myHistory")
 async def r_hist(_, info):
-    q = "{ myHistory { historyId transactionId userId amount type status createdAt } }"
+    q = "{ myHistory { historyId transactionId userId amount type vaNumber status createdAt } }"
     return (await proxy_gql(HISTORY_URL, q, {}, info.context["request"]))["myHistory"]
 
 @mutation.field("deleteHistory")
@@ -98,7 +91,14 @@ async def r_del_hist(_, info, historyId):
 type_defs = load_schema_from_path("schema.graphql")
 schema = make_executable_schema(type_defs, query, mutation)
 app = FastAPI(title="Gateway")
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_frontend():
+    with open("index.html", "r") as f:
+        return f.read()
+
 app.add_route("/graphql", GraphQL(schema, debug=True))
 
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

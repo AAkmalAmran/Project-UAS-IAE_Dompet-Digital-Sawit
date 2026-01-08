@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dompet Digital Sawit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div id="app" class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
+        <h1 class="text-3xl font-bold mb-6 text-green-700 text-center">Dompet Digital Sawit</h1>
+        
+        <div id="auth-container">
+            <div id="login-section" class="max-w-md mx-auto">
+                <h2 class="text-xl font-semibold mb-4">Masuk</h2>
+                <input id="login-email" type="email" placeholder="Email" class="border p-2 mb-2 w-full rounded">
+                <input id="login-pass" type="password" placeholder="Password" class="border p-2 mb-4 w-full rounded">
+                <button onclick="login()" class="bg-green-600 text-white p-2 rounded w-full font-bold hover:bg-green-700 mb-4">Login</button>
+                <p class="text-center text-sm">Belum punya akun? <a href="#" onclick="toggleAuth(true)" class="text-blue-600 underline">Daftar di sini</a></p>
+            </div>
+
+            <div id="register-section" class="max-w-md mx-auto hidden">
+                <h2 class="text-xl font-semibold mb-4">Daftar Akun Baru</h2>
+                <input id="reg-username" type="text" placeholder="Username" class="border p-2 mb-2 w-full rounded">
+                <input id="reg-fullname" type="text" placeholder="Nama Lengkap" class="border p-2 mb-2 w-full rounded">
+                <input id="reg-email" type="email" placeholder="Email" class="border p-2 mb-2 w-full rounded">
+                <input id="reg-pass" type="password" placeholder="Password" class="border p-2 mb-4 w-full rounded">
+                <button onclick="register()" class="bg-blue-600 text-white p-2 rounded w-full font-bold hover:bg-blue-700 mb-4">Daftar</button>
+                <p class="text-center text-sm">Sudah punya akun? <a href="#" onclick="toggleAuth(false)" class="text-green-600 underline">Login di sini</a></p>
+            </div>
+        </div>
+
+        <div id="dashboard-section" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <p class="text-lg">Halo, <span id="user-name" class="font-bold"></span></p>
+                <button onclick="location.reload()" class="text-red-500 text-sm underline">Keluar</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="border p-4 rounded-lg bg-green-50 border-green-200">
+                    <h3 class="font-bold text-green-800 mb-3">Saldo Dompet</h3>
+                    <div id="wallet-list" class="space-y-3"></div>
+                    <button onclick="createWallet()" class="mt-4 text-blue-600 text-sm font-medium hover:underline">+ Buat Wallet Baru</button>
+                </div>
+                <div class="border p-4 rounded-lg bg-blue-50 border-blue-200">
+                    <h3 class="font-bold text-blue-800 mb-3">Transaksi Baru</h3>
+                    <label for="trx-wallet-id" class="block text-xs font-bold mb-1 text-gray-600">Pilih Wallet Asal</label>
+                    <select id="trx-wallet-id" class="border p-2 mb-2 w-full text-sm rounded">
+                        <option value="">-- Memuat Wallet... --</option>
+                    </select>
+                    <label for="trx-amount" class="block text-xs font-bold mb-1 text-gray-600">Nominal</label>
+                    <input id="trx-amount" type="number" placeholder="Jumlah (Rp)" class="border p-2 mb-2 w-full text-sm rounded">
+                    <label for="trx-type" class="block text-xs font-bold mb-1 text-gray-600">Tipe Transaksi</label>
+                    <select id="trx-type" title="Pilih Tipe Transaksi" class="border p-2 mb-2 w-full text-sm rounded">
+                        <option value="DEPOSIT">DEPOSIT (Isi Saldo)</option>
+                        <option value="PAYMENT">PEMBAYARAN (VA)</option>
+                    </select>
+                    <label for="trx-va" class="block text-xs font-bold mb-1 text-gray-600">Nomor VA (Opsional)</label>
+                    <input id="trx-va" placeholder="Nomor VA Marketplace" class="border p-2 mb-4 w-full text-sm rounded">
+                    <button onclick="createTrx()" class="bg-blue-600 text-white p-2 rounded w-full font-bold hover:bg-blue-700">Kirim Transaksi</button>
+                </div>
+            </div>
+            <h3 class="font-bold text-gray-700 mb-3">Riwayat Mutasi Terakhir (History Service)</h3>
+            <div id="history-list" class="bg-gray-50 rounded border overflow-hidden">
+                <div class="grid grid-cols-5 bg-gray-200 p-2 text-xs font-bold">
+                    <div>WAKTU</div><div>TIPE</div><div>VA</div><div>JUMLAH</div><div>STATUS</div>
+                </div>
+                <div id="history-content" class="text-xs"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/graphql';
+        let token = '';
+
+        async function gql(query, variables = {}) {
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify({ query, variables })
+            });
+            const json = await res.json();
+            if (json.errors) throw new Error(json.errors[0].message);
+            return json.data;
+        }
+
+        function toggleAuth(showRegister) {
+            document.getElementById('login-section').classList.toggle('hidden', showRegister);
+            document.getElementById('register-section').classList.toggle('hidden', !showRegister);
+        }
+
+        async function register() {
+            const u = document.getElementById('reg-username').value;
+            const f = document.getElementById('reg-fullname').value;
+            const e = document.getElementById('reg-email').value;
+            const p = document.getElementById('reg-pass').value;
+            try {
+                const data = await gql(`mutation($u: String!, $f: String!, $e: String!, $p: String!) { registerUser(username: $u, fullname: $f, email: $e, password: $p) }`, { u, f, e, p });
+                alert(data.registerUser);
+                toggleAuth(false);
+            } catch (err) { alert('Gagal Daftar: ' + err.message); }
+        }
+
+        async function login() {
+            const e = document.getElementById('login-email').value;
+            const p = document.getElementById('login-pass').value;
+            try {
+                const data = await gql(`mutation($e: String!, $p: String!) { loginUser(email: $e, password: $p) { access_token user { username } } }`, { e, p });
+                token = data.loginUser.access_token;
+                document.getElementById('user-name').innerText = data.loginUser.user.username;
+                document.getElementById('auth-container').classList.add('hidden');
+                document.getElementById('dashboard-section').classList.remove('hidden');
+                loadData();
+            } catch (err) { alert('Gagal Login: ' + err.message); }
+        }
+
+        async function loadData() {
+            try {
+                const data = await gql(`{ myWallets { walletId walletName balance status } myHistory { type amount vaNumber createdAt status } }`);
+                
+                document.getElementById('wallet-list').innerHTML = data.myWallets.map(w => `
+                    <div class="bg-white p-2 rounded border shadow-sm flex justify-between items-center">
+                        <div>
+                            <div class="text-xs text-gray-500 uppercase">${w.walletName}</div>
+                            <div class="text-lg font-bold text-green-700">Rp ${w.balance.toLocaleString()}</div>
+                        </div>
+                        <button onclick="deleteWallet('${w.walletId}')" class="text-red-500 text-xs hover:underline">Hapus</button>
+                    </div>`).join('');
+
+                const select = document.getElementById('trx-wallet-id');
+                select.innerHTML = data.myWallets.length > 0 
+                    ? data.myWallets.map(w => `<option value="${w.walletId}">${w.walletName} (Rp ${w.balance.toLocaleString()})</option>`).join('')
+                    : '<option value="">-- Buat Wallet Dahulu --</option>';
+
+                document.getElementById('history-content').innerHTML = data.myHistory.map(h => `
+                    <div class="grid grid-cols-5 p-2 border-b hover:bg-white">
+                        <div>${h.createdAt.split('.')[0]}</div>
+                        <div class="font-bold">${h.type}</div>
+                        <div>${h.vaNumber || '-'}</div>
+                        <div>Rp ${h.amount.toLocaleString()}</div>
+                        <div class="text-green-600">${h.status}</div>
+                    </div>`).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        async function deleteWallet(id) {
+            if (confirm('Hapus wallet ini?')) {
+                try {
+                    const data = await gql(`mutation($id: String!) { deleteWallet(walletId: $id) { success message } }`, { id });
+                    alert(data.deleteWallet.message);
+                    loadData();
+                } catch (err) { alert(err.message); }
+            }
+        }
+
+        async function createWallet() {
+            const n = prompt('Nama Wallet Baru:');
+            if (n) {
+                try {
+                    await gql(`mutation($n: String!) { createWallet(walletName: $n) { walletId } }`, { n });
+                    loadData();
+                } catch (err) { alert(err.message); }
+            }
+        }
+
+        async function createTrx() {
+            const walletId = document.getElementById('trx-wallet-id').value;
+            if (!walletId) return alert('Pilih wallet!');
+            const input = {
+                walletId,
+                amount: parseFloat(document.getElementById('trx-amount').value),
+                type: document.getElementById('trx-type').value,
+                vaNumber: document.getElementById('trx-va').value || null
+            };
+            try {
+                await gql(`mutation($i: TransactionInput!) { createTransaction(input: $i) { transactionId status } }`, { i: input });
+                alert('Transaksi Berhasil!');
+                loadData();
+            } catch (err) { alert('Gagal: ' + err.message); }
+        }
+    </script>
+</body>
+</html>
