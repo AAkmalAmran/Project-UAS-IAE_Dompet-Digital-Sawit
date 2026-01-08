@@ -49,6 +49,10 @@ type_defs = """
         balance: Float
         status: String
     }
+    type DeleteResponse {
+        success: Boolean
+        message: String
+    }
     type Query {
         myWallets: [Wallet]
     }
@@ -56,6 +60,7 @@ type_defs = """
         createWallet(walletName: String!): Wallet
         topupWallet(walletId: String!, amount: Float!): Wallet
         deductWallet(walletId: String!, amount: Float!): Wallet
+        deleteWallet(walletId: String!): DeleteResponse
     }
 """
 
@@ -116,6 +121,25 @@ def resolve_deduct(_, info, walletId, amount):
         w.balance -= amount
         db.commit()
         return {"walletId": w.wallet_id, "userId": w.user_id, "walletName": w.wallet_name, "balance": w.balance, "status": w.status}
+    finally:
+        db.close()
+
+@mutation.field("deleteWallet")
+def resolve_delete(_, info, walletId):
+    request = info.context["request"]
+    user = get_current_user(request)
+    
+    db = SessionLocal()
+    try:
+        w = db.query(Wallet).filter(Wallet.wallet_id == walletId).first()
+        if not w:
+            return {"success": False, "message": "Wallet tidak ditemukan"}
+        if w.user_id != str(user["user_id"]):
+            return {"success": False, "message": "Anda tidak memiliki akses ke wallet ini"}
+        
+        db.delete(w)
+        db.commit()
+        return {"success": True, "message": f"Wallet '{w.wallet_name}' berhasil dihapus"}
     finally:
         db.close()
 

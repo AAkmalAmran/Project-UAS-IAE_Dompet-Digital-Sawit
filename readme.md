@@ -122,7 +122,7 @@ python generate_keys.py
 
 * Membersihkan kunci lama yang mungkin rusak.
 * Membuat `private.pem` dan `public.pem` baru.
-* Menyimpannya di folder `user-service`.
+* Menyimpannya di folder `auth-service`.
 * *(Catatan: Docker Compose akan otomatis membagikan `public.pem` ke service lain).*
 
 ### 3. Jalankan dengan Docker Compose
@@ -170,6 +170,7 @@ Berikut adalah daftar lengkap Query dan Mutation yang tersedia di sistem. Semua 
 | **Wallet Service** | Mutation | `createWallet` | Membuat dompet digital baru.<br>*(Input: walletName)* |
 | | Mutation | `topupWallet` | Menambah saldo dompet (Deposit).<br>*(Input: walletId, amount)* |
 | | Mutation | `deductWallet` | Mengurangi saldo (Pembayaran/Transfer).<br>*(Input: walletId, amount)* |
+| | Mutation | `deleteWallet` | Menghapus dompet digital.<br>*(Input: walletId)* |
 | | Query | `myWallets` | Melihat daftar dompet dan saldo milik pengguna. |
 | **Transaction Service** | Mutation | `createTransaction` | Memproses transaksi baru.<br>*(Input: walletId, amount, type [DEPOSIT/PAYMENT/TRANSFER], vaNumber [opsional])* |
 | | Mutation | `deleteAllTransactions` | Menghapus riwayat transaksi pengguna di `transactions.db`. |
@@ -224,12 +225,13 @@ mutation loginNasabah{
 
 *Gunakan Header:* `Authorization: Bearer <TOKEN_ANDA>`
 
-**Buat Wallet Baru:**
+**Buat Wallet Baru (Create):**
 
 ```graphql
 mutation buatWallet{
   createWallet(walletName: "Tabungan Utama") {
     walletId
+    userId
     walletName
     balance
     status
@@ -240,11 +242,13 @@ mutation buatWallet{
 
 *Copy `walletId` untuk digunakan saat transaksi.*
 
-**Cek Saldo:**
+**Lihat Semua Wallet (Read):**
 
 ```graphql
 query cekWallet{
   myWallets {
+    walletId
+    userId
     walletName
     balance
     status
@@ -252,6 +256,48 @@ query cekWallet{
 }
 
 ```
+
+**Top Up Saldo (Update - Tambah):**
+
+```graphql
+mutation topUp{
+  topupWallet(walletId: "PASTE_WALLET_ID_DISINI", amount: 500000) {
+    walletId
+    walletName
+    balance
+    status
+  }
+}
+
+```
+
+**Kurangi Saldo (Update - Kurang):**
+
+```graphql
+mutation kurangiSaldo{
+  deductWallet(walletId: "PASTE_WALLET_ID_DISINI", amount: 50000) {
+    walletId
+    walletName
+    balance
+    status
+  }
+}
+
+```
+
+**Hapus Wallet (Delete):**
+
+```graphql
+mutation hapusWallet{
+  deleteWallet(walletId: "PASTE_WALLET_ID_DISINI") {
+    success
+    message
+  }
+}
+
+```
+
+*Catatan: Hanya pemilik wallet yang dapat menghapus wallet miliknya.*
 
 ### 3. Transaksi (Transaction)
 
