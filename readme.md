@@ -8,40 +8,27 @@
 
 Proyek ini dirancang untuk menjawab tantangan arsitektur monolitik tradisional dengan memecah sistem menjadi layanan-layanan yang otonom, terisolasi, dan saling berkomunikasi menggunakan protokol **GraphQL** di atas HTTP. Setiap layanan berjalan dalam kontainer terpisah (Docker) dan memiliki basis data masing-masing (*Database-per-Service*) untuk menjamin independensi data dan mencegah kegagalan sistem secara menyeluruh (*Single Point of Failure*).
 
-Sistem ini bertindak sebagai *Service Provider* yang menangani pemrosesan transaksi pembayaran, manajemen saldo, validasi keamanan (Fraud Detection), serta pencatatan audit, dan terintegrasi dengan sistem eksternal (Marketplace) secara *real-time*.
+Sistem ini bertindak sebagai *Service Provider* yang menangani pemrosesan transaksi pembayaran, manajemen saldo, validasi keamanan (Fraud Detection), serta pencatatan audit. Sistem juga mendukung **Integrasi 2 Arah** dengan sistem eksternal (Marketplace), di mana Dompet Digital Sawit bertindak sebagai penerbit resmi *Virtual Account* (VA).
 
 ### Fitur & Karakteristik Utama
 
 1. **Arsitektur Microservices Terdistribusi:**
 Sistem terdiri dari lima layanan utama yang memiliki tanggung jawab spesifik:
     * **Auth Service:** Mengelola identitas pengguna dan keamanan berbasis *Independent JWT Authentication* menggunakan algoritma asimetris RS256.
-
-
-    * **Transaction Service:** Bertindak sebagai *Payment Gateway* dan orkestrator yang mengatur alur pembayaran dari inisiasi hingga penyelesaian.
-
-
+    * **Transaction Service:** Bertindak sebagai *Payment Gateway* dan orkestrator yang mengatur alur pembayaran, serta penerbit resmi nomor *Virtual Account*.
     * **Wallet Service:** Mengelola penyimpanan dana (*Fund Manager*) dan memastikan integritas saldo pengguna secara atomik.
-
-
     * **Fraud Detection Service:** Mesin keamanan yang memvalidasi risiko transaksi dan mencegah aktivitas mencurigakan atau penipuan.
-
-
     * **History Service:** Layanan pencatatan audit (*Audit Trail*) yang menyimpan riwayat mutasi transaksi untuk kebutuhan pelaporan.
 
-
 2. **Full Native GraphQL Communication:**
-Seluruh komunikasi antar-layanan (Inter-service) maupun dengan klien eksternal dilakukan menggunakan *Query* dan *Mutation* GraphQL, memberikan kontrak data yang eksplisit dan fleksibel.
+Seluruh komunikasi antar-layanan (Inter-service) maupun dengan klien eksternal dilakukan menggunakan *Query* dan *Mutation* GraphQL.
 
-
-3. **API Gateway Proxy:**
-Menggunakan Gateway sebagai pintu masuk tunggal (*Entry Point*) yang meneruskan permintaan klien ke layanan mikro yang relevan.
-
-
-4. **Integrasi Eksternal (Marketplace):**
-Sistem menyediakan endpoint publik untuk memproses pembayaran dari aplikasi Marketplace luar (seperti *BlackDoctrine*), memvalidasi tagihan via Virtual Account, dan memberikan respon status pelunasan secara otomatis.
+3. **Integrasi Eksternal 2 Arah (Two-Way Integration):**
+    * **Inbound:** Menerima permintaan pembuatan VA dari Marketplace saat *checkout*.
+    * **Outbound:** Mengirim notifikasi status pelunasan (*Callback*) ke Marketplace setelah pembayaran sukses.
 
 ### Integrasi Antar Sistem
-Berikut adalah sistem yang perlu ada sebelum melakukan uji integrasi
+Berikut adalah sistem yang perlu ada sebelum melakukan uji integrasi:
 1. BlackDoctrine (Marketplace): https://github.com/felix787878/BlackDoctrine.git
 2. GoShip (Ekspedisi): https://github.com/TopasAkbar/GoShip.git
 
@@ -76,11 +63,13 @@ flowchart TB
     %% Flow Communication (Gateway Proxy)
     Gateway -- Proxies Query --> Auth & Wallet & Trx & Fraud & History
     
-    %% Inter-service Communication (GraphQL Calls)
+    %% Inter-service Communication
+    Marketplace -- Request VA --> Trx
+    Trx -- Callback Status --> Marketplace
+    
     Trx -- Mutation: checkFraud --> Fraud
     Trx -- Mutation: topup/deductWallet --> Wallet
     Trx -- Mutation: addHistory --> History
-    Trx -- Query/Mutation (Integration) --> Marketplace
 
     %% DB Connections
     Auth --> DB1
@@ -174,6 +163,7 @@ Berikut adalah daftar lengkap Query dan Mutation yang tersedia di sistem. Semua 
 | | Query | `myWallets` | Melihat daftar dompet dan saldo milik pengguna. |
 | **Transaction Service** | Mutation | `createTransaction` | Memproses transaksi baru.<br>*(Input: walletId, amount, type [DEPOSIT/PAYMENT/TRANSFER], vaNumber [opsional])* |
 | | Mutation | `deleteAllTransactions` | Menghapus riwayat transaksi pengguna di `transactions.db`. |
+| | Mutation | `generateInvoiceVA` | Menerbitkan nomor VA resmi untuk tagihan eksternal. |
 | | Query | `myTransactions` | Melihat riwayat transaksi pengguna. |
 | **Fraud Service** | Mutation | `checkFraud` | Mengecek risiko transaksi (Internal).<br>*(Input: userId, amount)* |
 | | Mutation | `deleteFraudLog` | Menghapus log deteksi fraud (Admin Only).<br>*(Input: logId)* |
@@ -420,71 +410,61 @@ sequenceDiagram
 
     box "Dompet Digital Sawit" #1E4D2B
         participant Gateway as API Gateway
-        participant Auth as Auth Service
         participant Trans as Transaction Service
-        participant Fraud as Fraud Service
+        participant Auth as Auth Service
         participant Wallet as Wallet Service
+        participant Fraud as Fraud Service
         participant History as History Service
     end
 
-    Note over User, Order: 1. Checkout di BlackDoctrine (Akun A)
+    Note over User, Order: 1. Checkout di BlackDoctrine
 
-    User->>Order: CreateOrder(Items, Total)
+    User->>Order: CreateOrder(Items)
     activate Order
-    Order->>Order: Generate VAnumber & Total
+    
+    Note right of Order: Request VA Resmi
+    Order->>Gateway: generateInvoiceVA(Total)
+    Gateway->>Trans: generateInvoiceVA()
+    Trans-->>Gateway: Return "8800xxxx"
+    Gateway-->>Order: Return VA Number
+    
+    Order->>Order: Save Order (Pending)
+    Order-->>User: Tampilkan VA & Total
     deactivate Order
 
-    Note over User, Auth: 2. Redirection ke Dompet Sawit (Akun B)
+    Note over User, Auth: 2. Pembayaran di Dompet Sawit
 
-    User->>Gateway: Login (Email, Pass)
+    User->>Gateway: Login & Get Token
+    Gateway->>Auth: Authenticate
+    Auth-->>Gateway: Token Valid
+
+    User->>Gateway: createTransaction(VA, Amount)
     activate Gateway
-    Gateway->>Auth: VerifyCredential(Email, Pass)
-    activate Auth
-    Auth->>Auth: Validate Hash
-    Auth-->>Gateway: Token Valid / Login Sukses
-    deactivate Auth
-
-    Note over Gateway, Wallet: 3. Eksekusi Pembayaran
-
-    Gateway->>Trans: ProcessPayment(Token, VAnumber, Total)
+    Gateway->>Trans: ProcessPayment(VA, Amount)
     activate Trans
 
-        Trans-->>Order: checkOrder(vaNumber & Total)
-        Order->>Order: getOrderbyVa(vaNumber)
-        Order->>Gateway: orderValid
-        Gateway->>Trans: continueTRX
+        Trans->>Trans: Validate VA Existence
+        
+        Trans->>Fraud: checkFraud(UserID, Amount)
+        Fraud-->>Trans: Safe
 
-        Trans->>Fraud: checkFraud(UserID, Total)
-        activate Fraud
-        Fraud->>Fraud: Scoring Analysis
-        Fraud-->>Trans: Result: Transaction SAFE
-        deactivate Fraud
+        Trans->>Wallet: DeductSaldo(UserID, Amount)
+        Wallet-->>Trans: Success
 
-        Trans->>Wallet: DebitSaldo(UserID, Total)
-        activate Wallet
-        Wallet->>Wallet: Cek Saldo & Lock Amount
-        Wallet-->>Trans: Saldo Berhasil Dipotong
-        deactivate Wallet
-        Trans->>Trans: Update Status Transaksi: SUCCESS
-
-        activate History
         Trans->>History: addHistory()
-        History->>History: saveTransactions()
-        deactivate History
 
-    Trans-->>Gateway: Payment Response (Success)
-
+    Trans-->>Gateway: Payment Success
     deactivate Trans
-
-
-    Gateway->>Order: Webhook: PaymentSuccess(vaNumber & status)
-
-    activate Order
-    Order->>Order: Update Order Status: PAID
-    deactivate Order
-
-    
+    Gateway-->>User: Struk Pembayaran
     deactivate Gateway
+
+    Note over Gateway, Order: 3. Callback / Konfirmasi
+
+    Gateway->>Order: Webhook: PaymentSuccess(VA)
+    activate Order
+    Order->>Order: Update Status: PAID
+    Order-->>Gateway: Acknowledge
+    deactivate Order
 ```
 ---
 ## Tes Integrasi 
