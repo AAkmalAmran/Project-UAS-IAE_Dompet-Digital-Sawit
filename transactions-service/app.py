@@ -67,7 +67,7 @@ async def validate_marketplace_order(va_number: str, amount: float):
                 raise Exception("VA Not Found")
             
             if float(data["totalHarga"]) != float(amount):
-                raise Exception("Nominal Mismatch")
+                raise Exception("Total harga tidak sesuai dengan tagihan VA")
                 
             return True
         except Exception as e:
@@ -150,9 +150,8 @@ def resolve_list(_, info):
 
 @mutation.field("generateInvoiceVA")
 def resolve_generate_va(_, info, amount, description):
-    # 1. Generate Nomor Unik (Prefix DS-8800 + Angka Acak)
     prefix = "DS-8800"
-    random_digits = random.randint(10000000, 99999999)
+    random_digits = random.randint(100000, 999999)
     va_number = f"{prefix}{random_digits}"
     
     print(f"Issued VA {va_number} for amount {amount} ({description})")
@@ -169,6 +168,12 @@ async def resolve_create(_, info, input):
     wallet_id = input["walletId"]
     trx_type = input["type"]
     va_number = input.get("vaNumber")
+
+    # Validasi input VA Number untuk PAYMENT
+    if trx_type == "PAYMENT" and not va_number:
+        raise Exception("Transaksi Ditolak: Nomor VA wajib diisi untuk tipe PAYMENT")
+    elif trx_type != "PAYMENT" and va_number:
+        raise Exception("Transaksi Ditolak: Nomor VA hanya boleh diisi untuk tipe PAYMENT")
 
     # Validasi Format VA: Harus diawali "DS-8800"
     if trx_type == "PAYMENT":
@@ -191,7 +196,7 @@ async def resolve_create(_, info, input):
 
     # 1. VALIDASI MARKETPLACE 
     if trx_type == "PAYMENT":
-        if not va_number: raise Exception("VA Number Required for Payment")
+        if not va_number: raise Exception("Transaksi Ditolak: Nomor VA wajib diisi untuk tipe PAYMENT")
         await validate_marketplace_order(va_number, amount)
 
     # 2. CEK FRAUD (Fraud Service)
