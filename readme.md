@@ -429,7 +429,6 @@ sequenceDiagram
     Gateway-->>Order: Return VA Number
     
     Order->>Order: Save Order (Pending)
-    Order-->>User: Tampilkan VA & Total
     deactivate Order
 
     Note over User, Auth: 2. Pembayaran di Dompet Sawit
@@ -444,6 +443,13 @@ sequenceDiagram
     activate Trans
 
         Trans->>Trans: Validate VA Existence
+        Trans-->>Gateway: getOrderByVA()
+        activate Order
+        Gateway-->>Order: getOrderByVA()
+        Order->>Order: getOrderByVA()
+        Order->>Gateway: Valid
+        deactivate Order
+        Gateway->>Trans: continue Transactions
         
         Trans->>Fraud: checkFraud(UserID, Amount)
         Fraud-->>Trans: Safe
