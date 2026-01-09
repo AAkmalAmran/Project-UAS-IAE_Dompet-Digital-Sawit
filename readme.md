@@ -375,15 +375,28 @@ query cekHistori{
 }
 ```
 
+**Hapus History Tertentu:**
+
+```graphql
+mutation hapusHistori{
+  deleteHistory(
+    historyId: "PASTE_HISTORY ID"
+  )
+}
+```
+
+
+
 ### 5. Admin & Fraud
 
-*Login dengan akun admin (lihat `.env` user-service) untuk akses ini.*
+*Login dengan akun admin untuk akses ini.*
+```
+Admin Email= admin@gmail.com
+Admin Password= admin12345
+```
+
 
 **Cek Log Fraud:**
-
-* Admin Email= admin@gmail.com
-* Admin Password= admin12345
-
 ```graphql
 query cekFraud{
   getFraudLogs {
@@ -394,7 +407,26 @@ query cekFraud{
     reason
   }
 }
+```
 
+**Cek Fraud:**
+```graphql
+mutation cekFraud{
+  checkFraud(userId: "2", amount: 666) {
+    is_fraud
+    status
+    reason
+  }
+}
+```
+
+**Hapus Fraud Log:**
+```graphql
+mutation hapusfraudlog{
+  deleteFraudLog(
+    logId: "COPY_FRAUD_ID"
+  )
+}
 ```
 
 ---
@@ -461,7 +493,6 @@ sequenceDiagram
 
     Trans-->>Gateway: Payment Success
     deactivate Trans
-    Gateway-->>User: Struk Pembayaran
     deactivate Gateway
 
     Note over Gateway, Order: 3. Callback / Konfirmasi
@@ -476,7 +507,7 @@ sequenceDiagram
 ## Tes Integrasi 
 - BlackDoctrine (Marketplace): http://localhost:7003/graphql
 - Dompet Digital Sawit: http://localhost:8000/graphql
-- goShip (Ekspedisi) 
+- goShip (Ekspedisi) (Yang Penting Nyala) 
 ### 1. Buat Order (7003)
 ```graphql
 mutation Checkout {
