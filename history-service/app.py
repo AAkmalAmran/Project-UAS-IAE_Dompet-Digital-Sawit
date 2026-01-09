@@ -78,7 +78,7 @@ def resolve_history(_, info):
     db = SessionLocal()
     try:
         hist = db.query(History).filter(History.user_id == str(user["user_id"])).order_by(History.created_at.desc()).all()
-        return [{"historyId": h.history_id, "transactionId": h.transaction_id, "userId": h.user_id, "amount": h.amount, "type": h.type, "status": h.status, "createdAt": str(h.created_at)} for h in hist]
+        return [{"historyId": h.history_id, "transactionId": h.transaction_id, "userId": h.user_id, "amount": h.amount, "type": h.type, "status": h.status, "vaNumber": h.va_number, "createdAt": str(h.created_at)} for h in hist]
     finally:
         db.close()
 
