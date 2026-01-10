@@ -98,6 +98,9 @@ def resolve_topup(_, info, walletId, amount):
     request = info.context["request"]
     get_current_user(request) 
     
+    # Validasi amount tidak boleh negatif
+    if amount < 0: raise Exception("Amount must be positive")
+    
     db = SessionLocal()
     try:
         w = db.query(Wallet).filter(Wallet.wallet_id == walletId).first()
@@ -112,6 +115,9 @@ def resolve_topup(_, info, walletId, amount):
 def resolve_deduct(_, info, walletId, amount):
     request = info.context["request"]
     get_current_user(request)
+    
+    # Validasi amount tidak boleh negatif
+    if amount < 0: raise Exception("Amount must be positive")
     
     db = SessionLocal()
     try:
