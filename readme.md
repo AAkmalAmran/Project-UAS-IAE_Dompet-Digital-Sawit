@@ -32,6 +32,8 @@ Berikut adalah sistem yang perlu ada sebelum melakukan uji integrasi:
 1. BlackDoctrine (Marketplace): https://github.com/felix787878/BlackDoctrine.git
 2. GoShip (Ekspedisi): https://github.com/TopasAkbar/GoShip.git
 
+**Note: Untuk GoShip, ketika selesai melakukan docker-compose, harap di restart ulang agar database dari GoShip dapat dibaca oleh sistem.**
+
 ---
 
 ## Arsitektur Sistem
