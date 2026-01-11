@@ -1,10 +1,12 @@
 import os
 import uuid
 import uvicorn
+import threading
+import time
 from enum import Enum as PyEnum
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from sqlalchemy import create_engine, Column, String, Float, Enum
+from sqlalchemy import create_engine, Column, String, Float, Enum, update
 from sqlalchemy.orm import sessionmaker, declarative_base
 from jose import jwt
 from ariadne import QueryType, MutationType, make_executable_schema
@@ -39,7 +41,7 @@ def get_current_user(request):
     try:
         return jwt.decode(token, PUBLIC_KEY, algorithms=["RS256"])
     except:
-        raise Exception("Unauthorized")
+        raise Exception("Tidak terautentikasi")
 
 type_defs = """
     type Wallet {
@@ -53,6 +55,12 @@ type_defs = """
         success: Boolean
         message: String
     }
+    type RaceConditionResult {
+        expectedBalance: Float
+        actualBalance: Float
+        hasRaceCondition: Boolean
+        message: String
+    }
     type Query {
         myWallets: [Wallet]
     }
@@ -61,6 +69,7 @@ type_defs = """
         topupWallet(walletId: String!, amount: Float!): Wallet
         deductWallet(walletId: String!, amount: Float!): Wallet
         deleteWallet(walletId: String!): DeleteResponse
+        simulateRaceCondition(walletId: String!, iterations: Int!, topupAmount: Float!, deductAmount: Float!): RaceConditionResult
     }
 """
 
@@ -94,19 +103,18 @@ def resolve_create(_, info, walletName):
 
 @mutation.field("topupWallet")
 def resolve_topup(_, info, walletId, amount):
-    # Validasi token (Service-to-Service juga perlu token valid)
     request = info.context["request"]
     get_current_user(request) 
     
-    # Validasi amount tidak boleh negatif
-    if amount < 0: raise Exception("Amount must be positive")
+    if amount < 0: raise Exception("Jumlah harus positif")
     
     db = SessionLocal()
     try:
-        w = db.query(Wallet).filter(Wallet.wallet_id == walletId).first()
-        if not w: raise Exception("Wallet not found")
-        w.balance += amount
+        w = db.query(Wallet).filter(Wallet.wallet_id == walletId).with_for_update().first()
+        if not w: raise Exception("Wallet tidak ditemukan")
+        db.execute(update(Wallet).where(Wallet.wallet_id == walletId).values(balance=Wallet.balance + amount))
         db.commit()
+        db.refresh(w)
         return {"walletId": w.wallet_id, "userId": w.user_id, "walletName": w.wallet_name, "balance": w.balance, "status": w.status}
     finally:
         db.close()
@@ -116,16 +124,16 @@ def resolve_deduct(_, info, walletId, amount):
     request = info.context["request"]
     get_current_user(request)
     
-    # Validasi amount tidak boleh negatif
-    if amount < 0: raise Exception("Amount must be positive")
+    if amount < 0: raise Exception("Jumlah harus positif")
     
     db = SessionLocal()
     try:
-        w = db.query(Wallet).filter(Wallet.wallet_id == walletId).first()
-        if not w: raise Exception("Wallet not found")
+        w = db.query(Wallet).filter(Wallet.wallet_id == walletId).with_for_update().first()
+        if not w: raise Exception("Wallet tidak ditemukan")
         if w.balance < amount: raise Exception("Saldo Tidak Mencukupi")
-        w.balance -= amount
+        db.execute(update(Wallet).where(Wallet.wallet_id == walletId).values(balance=Wallet.balance - amount))
         db.commit()
+        db.refresh(w)
         return {"walletId": w.wallet_id, "userId": w.user_id, "walletName": w.wallet_name, "balance": w.balance, "status": w.status}
     finally:
         db.close()
@@ -148,6 +156,76 @@ def resolve_delete(_, info, walletId):
         return {"success": True, "message": f"Wallet '{w.wallet_name}' berhasil dihapus"}
     finally:
         db.close()
+
+@mutation.field("simulateRaceCondition")
+def resolve_simulate_race(_, info, walletId, iterations, topupAmount, deductAmount):
+    request = info.context["request"]
+    get_current_user(request)
+    
+    db = SessionLocal()
+    try:
+        w = db.query(Wallet).filter(Wallet.wallet_id == walletId).first()
+        if not w: raise Exception("Wallet tidak ditemukan")
+        initial_balance = w.balance
+    finally:
+        db.close()
+    
+    expected_change = (topupAmount - deductAmount) * iterations
+    results = {"success": 0, "error": 0}
+    
+    def concurrent_topup():
+        db = SessionLocal()
+        try:
+            w = db.query(Wallet).filter(Wallet.wallet_id == walletId).with_for_update().first()
+            if w:
+                db.execute(update(Wallet).where(Wallet.wallet_id == walletId).values(balance=Wallet.balance + topupAmount))
+                db.commit()
+                results["success"] += 1
+        except:
+            results["error"] += 1
+        finally:
+            db.close()
+    
+    def concurrent_deduct():
+        db = SessionLocal()
+        try:
+            w = db.query(Wallet).filter(Wallet.wallet_id == walletId).with_for_update().first()
+            if w and w.balance >= deductAmount:
+                db.execute(update(Wallet).where(Wallet.wallet_id == walletId).values(balance=Wallet.balance - deductAmount))
+                db.commit()
+                results["success"] += 1
+        except:
+            results["error"] += 1
+        finally:
+            db.close()
+    
+    threads = []
+    for i in range(iterations):
+        t1 = threading.Thread(target=concurrent_topup)
+        t2 = threading.Thread(target=concurrent_deduct)
+        threads.extend([t1, t2])
+    
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    
+    db = SessionLocal()
+    try:
+        w = db.query(Wallet).filter(Wallet.wallet_id == walletId).first()
+        actual_balance = w.balance
+    finally:
+        db.close()
+    
+    expected_balance = initial_balance + expected_change
+    has_race = abs(actual_balance - expected_balance) > 0.01
+    
+    return {
+        "expectedBalance": expected_balance,
+        "actualBalance": actual_balance,
+        "hasRaceCondition": has_race,
+        "message": f"Menjalankan {iterations} pasang operasi topup+deduct secara bersamaan. Sukses: {results['success']}, Error: {results['error']}"
+    }
 
 schema = make_executable_schema(type_defs, query, mutation)
 app = FastAPI(title="Wallet Service GraphQL")
